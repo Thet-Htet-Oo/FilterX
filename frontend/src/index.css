@@ -1,0 +1,33 @@
+/* CSS Reset */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Merriweather:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+/* Font imports */
+
+
+/* Then your other CSS */
+body {
+  margin: 0;
+  font-family: 'Lato', sans-serif;
+}
+
+
+/* Global variables */
+:root {
+  --global-primary: #0b2545;
+  --global-secondary: #d4af37;
+  --global-light: #fdfaf6;
+  --global-dark: #1a1a1a;
+}
+
+body {
+  font-family: 'Lato', sans-serif;
+  color: var(--global-dark);
+  background-color: var(--global-light);
+}

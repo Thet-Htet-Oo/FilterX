@@ -1,0 +1,345 @@
+/* LoginSignup.css - Scoped with 'ls-' prefix */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap");
+
+.ls-container * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Montserrat", sans-serif;
+}
+
+.ls-container {
+  background-color: rgb(227, 230, 236);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.ls-main-container {
+  background-color: #0b2545;
+  border-radius: 30px;
+  box-shadow: 0 0 20px #d4af37;
+  position: relative;
+  overflow: hidden;
+  width: 768px;
+  max-width: 100%;
+  min-height: 480px;
+  animation: ls-floatBox 1.5s ease-in-out infinite;
+}
+
+.ls-main-container::before,
+.ls-main-container::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: 30px;
+  inset: 0;
+  border: 2px solid transparent;
+  z-index: 10;
+  animation: ls-neon-line-move 3s linear infinite;
+}
+
+.ls-main-container::before {
+  border-top: 2px solid #d4af37;
+  border-bottom: 2px solid #d4af37;
+  animation-delay: 0s;
+}
+
+.ls-main-container::after {
+  border-left: 2px solid #d4af37;
+  border-right: 2px solid #d4af37;
+  animation-delay: 1.5s;
+}
+
+@keyframes ls-neon-line-move {
+  0%,
+  100% {
+    box-shadow: 0 0 5px #d4af37, 0 0 15px #d4af37, 0 0 30px #d4af37, 0 0 60px #d4af37;
+  }
+
+  50% {
+    box-shadow: 0 0 15px #d4af37, 0 0 30px #d4af37, 0 0 45px #d4af37, 0 0 90px #d4af37;
+  }
+}
+
+/*@keyframes ls-floatBox {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}*/
+
+.ls-main-container p {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.3px;
+  margin: 20px 0;
+  color: #eee;
+}
+
+.ls-main-container span {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.ls-main-container a {
+  color: #d4af37;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.forget:hover{
+  text-decoration: underline;
+}
+
+.ls-main-container button {
+  background-color: #d4af37;
+  color: #fff;
+  font-size: 12px;
+  padding: 10px 45px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  width: 100%;
+}
+
+.ls-main-container button:hover {
+  color: #000000;
+  background-color: #d4af37;
+}
+
+.ls-main-container button.ls-hidden {
+  background-color: transparent;
+  border-color: #fff;
+}
+
+.ls-main-container form {
+  background-color: #0b2545;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding: 0 40px;
+  height: 100%;
+  z-index: 20;
+}
+
+.ls-main-container input {
+  background-color: #dad4c4;
+  border: none;
+  margin: 8px 0;
+  padding: 10px 15px;
+  font-size: 13px;
+  border-radius: 8px;
+  width: 100%;
+  outline: none;
+  color: #000;
+  transition: all 0.2s ease;
+}
+
+.ls-main-container input:focus {
+  box-shadow: 0 0 8px #d4af37;
+  color: #eee;
+  transform: scale(1.02);
+  background-color: #2a2a2a;
+}
+
+.ls-form-container {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transition: all 0.6s ease-in-out;
+}
+
+.ls-sign-in {
+  left: 0;
+  width: 50%;
+  z-index: 2;
+}
+
+.ls-main-container.ls-active .ls-sign-in {
+  transform: translateX(100%);
+}
+
+.ls-sign-up {
+  left: 0;
+  width: 50%;
+  opacity: 0;
+  z-index: 1;
+}
+
+.ls-main-container.ls-active .ls-sign-up {
+  transform: translateX(100%);
+  opacity: 1;
+  z-index: 5;
+  animation: ls-move 0.6s;
+}
+
+@keyframes ls-move {
+  0%,
+  49.99% {
+    opacity: 0;
+    z-index: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 1;
+    z-index: 5;
+  }
+}
+
+.ls-social-icons {
+  margin: 20px 0;
+}
+
+.ls-social-icons a {
+  border: 1px solid #ccc;
+  border-radius: 20%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 3px;
+  width: 40px;
+  height: 40px;
+}
+
+.ls-toggle-container {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  overflow: hidden;
+  transition: all 0.6s ease-in-out;
+  border-radius: 150px 0 0 100px;
+  z-index: 1000;
+}
+
+.ls-toggle-container button{
+  width: 50%;
+  color: #0b2545;
+}
+
+.ls-toggle-container button:hover{
+  background-color: #0b2545;
+  color: #eee;
+}
+
+.ls-main-container.ls-active .ls-toggle-container {
+  transform: translateX(-100%);
+  border-radius: 0 150px 100px 0;
+}
+
+.ls-toggle {
+  background-color: #d4af37;
+  height: 100%;
+  background: #d4af37;
+  color: #fff;
+  position: relative;
+  left: -100%;
+  height: 100%;
+  width: 200%;
+  transform: translateX(0);
+  transition: all 0.6s ease-in-out;
+}
+
+.ls-main-container.ls-active .ls-toggle {
+  transform: translateX(50%);
+}
+
+.ls-toggle-panel {
+  position: absolute;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 0 30px;
+  text-align: center;
+  top: 0;
+  transform: translateX(0);
+  transition: all 0.6s ease-in-out;
+}
+
+.ls-toggle-left {
+  transform: translateX(-200%);
+}
+
+.ls-main-container.ls-active .ls-toggle-left {
+  transform: translateX(0);
+}
+
+.ls-toggle-right {
+  right: 0;
+  transform: translateX(0);
+}
+
+.ls-main-container.ls-active .ls-toggle-right {
+  transform: translateX(200%);
+}
+
+.ls-main-container h1 {
+  white-space: nowrap;
+  color: #eee;
+}
+
+.ls-main-container h2 {
+  color: #eee;
+}
+
+/* Force country names to be black - HIGH SPECIFICITY */
+.ls-phone-input-wrapper .react-tel-input .country-list .country .country-name {
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+.ls-phone-input-wrapper .react-tel-input .country-list .country {
+  color: #000000 !important;
+}
+
+.ls-phone-input-wrapper .react-tel-input .country-list .country:hover .country-name,
+.ls-phone-input-wrapper .react-tel-input .country-list .country.highlight .country-name {
+  color: #000000 !important;
+}
+
+/* Make sure dial codes are also dark */
+.ls-phone-input-wrapper .react-tel-input .country-list .country .dial-code {
+  color: #666666 !important;
+}
+
+.ls-phone-input-wrapper .react-tel-input .country-list .country:hover .dial-code,
+.ls-phone-input-wrapper .react-tel-input .country-list .country.highlight .dial-code {
+  color: #000000 !important;
+}
+
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 2.5rem; /* space for the eye */
+}
+
+.toggle-eye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #666;
+}

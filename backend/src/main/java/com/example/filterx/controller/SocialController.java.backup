@@ -1,0 +1,282 @@
+package com.example.filterx.controller;
+import com.example.filterx.repository.ReplyLikeRepository;
+@Autowired
+private ReplyLikeRepository replyLikeRepository;
+
+
+import com.example.filterx.entity.*;
+import com.example.filterx.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+// Reply Likes endpoints
+@PostMapping("/replies/{replyId}/likes")
+public ResponseEntity<?> toggleReplyLike(@PathVariable Long replyId, @RequestBody Map<String, Long> request) {
+    try {
+        Long userId = request.get("userId");
+        
+        Optional<ReplyLike> existingLike = replyLikeRepository.findByUserIdAndReplyId(userId, replyId);
+        
+        if (existingLike.isPresent()) {
+            replyLikeRepository.delete(existingLike.get());
+            Map<String, Object> response = new HashMap<>();
+            response.put("liked", false);
+            response.put("message", "Reply like removed");
+            return ResponseEntity.ok(response);
+        } else {
+            Optional<User> user = userRepository.findById(userId);
+            Optional<Reply> reply = replyRepository.findById(replyId);
+            
+            if (user.isEmpty() || reply.isEmpty()) {
+                return ResponseEntity.badRequest().body("User or Reply not found");
+            }
+            
+            ReplyLike like = new ReplyLike(user.get(), reply.get());
+            replyLikeRepository.save(like);
+            
+            Map<String, Object极
+            response.put("liked", true);
+            response.put("message", "Reply like added");
+            return ResponseEntity.ok(response);
+        }
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body("Error toggling reply like: " + e.getMessage());
+    }
+}
+@RestController
+@RequestMapping("/api/social")
+@CrossOrigin(origins = "http://localhost:5173")
+public class SocialController {
+    
+    @Autowired
+    private PostRepository postRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private CommentRepository commentRepository;
+    
+    @Autowired
+    private LikeRepository likeRepository;
+    
+    @Autowired
+    private CommentLikeRepository commentLikeRepository;
+    
+    @Autowired
+    private ReplyRepository replyRepository;
+    
+    @Autowired
+    private ReplyLikeRepository replyLikeRepository;
+    
+    // Posts endpoints
+    @PostMapping("/posts")
+    public ResponseEntity<?> createPost(@RequestBody Map<String, Object> request) {
+        try {
+            String content = (String) request.get("content");
+            Long userId = Long.parseLong(request.get("userId").toString());
+            
+            Optional<User> user = userRepository.findById(userId);
+            if (user.isEmpty()) {
+                return ResponseEntity.badRequest().body("User not found");
+            }
+            
+            Post post = new Post(content, user.get());
+            Post createdPost = postRepository.save(post);
+            
+            return ResponseEntity.ok(createdPost);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error creating post: " + e.getMessage());
+        }
+    }
+    
+    @GetMapping("/posts")
+    public List<Post> getAllPosts() {
+        return postRepository.findAllByOrderByCreatedAtDesc();
+    }
+    
+    @GetMapping("/posts/user/{userId}")
+    public ResponseEntity<?> getUserPosts(@PathVariable Long userId) {
+        try {
+            List极
+            return ResponseEntity.ok(userPosts);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching user posts: " + e.getMessage());
+        }
+    }
+    
+    @GetMapping("/posts/me")
+    public ResponseEntity<?> getCurrentUserPosts(@RequestParam Long userId) {
+        try {
+            List<Post> userPosts = postRepository.findByUserIdOrderByCreatedAtDesc(user极
+            return ResponseEntity.ok(userPosts);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching user posts: " + e.getMessage());
+        }
+    }
+    
+    // Comments endpoints
+    @PostMapping("/comments")
+    public ResponseEntity<?> createComment(@RequestBody Map<String, Object> request) {
+        try {
+            String content = (String) request.get("content");
+            Long userId = Long.parseLong(request.get("userId").toString());
+            Long postId = Long.parseLong(request.get("postId").toString());
+            
+            Optional<User> user = userRepository.findById(userId);
+            Optional<Post> post = postRepository.findById(postId);
+            
+            if (user.isEmpty() || post.isEmpty()) {
+                return ResponseEntity.badRequest().body("User or Post not found");
+            }
+            
+            Comment comment = new Comment(content, user.get(), post.get());
+            Comment savedComment = commentRepository.save(comment);
+            
+            return ResponseEntity.ok(savedComment);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error creating comment: " + e.getMessage());
+        }
+    }
+    
+    // Likes endpoints
+    @PostMapping("/likes")
+    public ResponseEntity<?> toggleLike(@RequestBody Map<String, Long> request) {
+        try {
+            Long userId = request.get("userId");
+            Long postId = request.get("postId");
+            
+            Optional<Like> existingLike = likeRepository.findByUserIdAndPost极
+            if (existingLike.isPresent()) {
+                likeRepository.delete(existingLike.get());
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", false);
+                response极
+                return ResponseEntity.ok(response);
+            } else {
+                Optional<User> user = userRepository.findById(userId);
+                Optional极
+                if (user.isEmpty() || post.isEmpty()) {
+                    return ResponseEntity.badRequest().body("User or Post not found");
+                }
+                
+                Like like = new Like(user.get(), post.get());
+                likeRepository.save(like);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", true);
+                response.put("message", "Like added");
+                return ResponseEntity.ok(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error toggling like: " + e.getMessage());
+        }
+    }
+    
+    // Comment Likes endpoints
+    @PostMapping("/comments/{commentId}/likes")
+    public ResponseEntity<?> toggleCommentLike(@PathVariable Long commentId, @RequestBody Map<String, Long> request) {
+        try {
+            Long userId = request.get("userId");
+            
+            Optional<CommentLike> existingLike = commentLikeRepository.findByUserIdAndCommentId(userId, commentId);
+            
+            if (existingLike.isPresent()) {
+                commentLikeRepository.delete(existingLike.get());
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", false);
+                response.put("message", "Comment like removed");
+                return ResponseEntity.ok(response);
+            } else {
+                Optional<User> user = userRepository.findById(userId);
+                Optional<Comment> comment = commentRepository.findById(commentId);
+                
+                if (user.isEmpty() || comment.isEmpty()) {
+                    return ResponseEntity.badRequest().body("User or Comment not found");
+                }
+                
+                CommentLike like = new CommentLike(user.get(), comment.get());
+                commentLikeRepository.save(like);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", true);
+                response.put("message", "Comment like added");
+                return ResponseEntity.ok(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error toggling comment like: " + e.getMessage());
+        }
+    }
+    
+    // Reply Likes endpoints
+    @PostMapping("/replies/{replyId}/likes")
+    public ResponseEntity<?> toggleReplyLike(@PathVariable Long replyId, @RequestBody Map<String, Long> request) {
+        try {
+            Long userId = request.get("userId");
+            
+            Optional<ReplyLike> existingLike = replyLikeRepository.findByUserIdAndReplyId(userId, replyId);
+            
+            if (existingLike.isPresent()) {
+                replyLikeRepository.delete(existingLike.get());
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", false);
+                response.put("message", "Reply like removed");
+                return ResponseEntity.ok(response);
+            } else {
+                Optional<User> user = userRepository.findById(userId);
+                Optional<Reply> reply = replyRepository.findById(replyId);
+                
+                if (user.isEmpty() || reply.isEmpty()) {
+                    return ResponseEntity.badRequest().body("User or Reply not found");
+                }
+                
+                ReplyLike like = new ReplyLike(user.get(), reply.get());
+                replyLikeRepository.save(like);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("liked", true);
+                response.put("message", "Reply like added");
+                return ResponseEntity.ok(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error toggling reply like: " + e.getMessage());
+        }
+    }
+    
+    // Replies endpoints
+    @PostMapping("/comments/{commentId}/replies")
+    public ResponseEntity<?> createReply(@PathVariable Long commentId, @RequestBody Map<String, Object极
+        try {
+            String content = (String) request.get("content");
+            Long userId = Long.parseLong(request.get("userId").toString());
+            
+            Optional<User> user = userRepository.findById(userId);
+            Optional<Comment> comment = commentRepository.findById(commentId);
+            
+            if (user.isEmpty() || comment.isEmpty()) {
+                return ResponseEntity.badRequest().body("User or Comment not found");
+            }
+            
+            Reply reply = new Reply(content, user极
+            Reply savedReply = replyRepository.save(reply);
+            
+            return ResponseEntity.ok(savedReply);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("极
+        }
+    }
+    
+    @GetMapping("/comments/{commentId}/replies")
+    public ResponseEntity<?> getCommentReplies(@PathVariable Long commentId) {
+        try {
+            List<Reply> replies = replyRepository.findByCommentIdOrderByCreatedAtAsc(commentId);
+            return ResponseEntity.ok(replies);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching replies: " + e.getMessage());
+        }
+    }
+}

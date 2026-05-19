@@ -1,0 +1,935 @@
+import React, { useState, useEffect } from "react";
+import { useAuth } from "./AuthContext.jsx";
+import { useNavigate, Link } from "react-router-dom";
+import { useToast } from "./ToastContext.jsx";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap-icons/font/bootstrap-icons.css";
+import "./home.css";
+
+function Profile() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const [userPosts, setUserPosts] = useState([]);
+  const [allUserPosts, setAllUserPosts] = useState([]);
+  const [postText, setPostText] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [currentCategory, setCurrentCategory] = useState(null);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    addToast("You have been logged out successfully", "info");
+    navigate("/");
+  };
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadUserPosts();
+    }
+  }, [user, categories]);
+
+  // FIXED: Safer filter that handles missing category data
+  useEffect(() => {
+    if (filterCategory === "all") {
+      setUserPosts(allUserPosts);
+    } else {
+      const categoryId = parseInt(filterCategory);
+      const filteredPosts = allUserPosts.filter(post => 
+        post.category?.id === categoryId  // Using optional chaining for safety
+      );
+      setUserPosts(filteredPosts);
+    }
+  }, [filterCategory, allUserPosts]);
+
+  useEffect(() => {
+    if (filterCategory !== "all") {
+      const category = categories.find(c => c.id === parseInt(filterCategory));
+      setCurrentCategory(category);
+    } else {
+      setCurrentCategory(null);
+    }
+  }, [filterCategory, categories]);
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/social/categories');
+      if (response.ok) {
+        const categoriesData = await response.json();
+        setCategories(categoriesData);
+      } else {
+        console.error('Failed to load categories:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const handleCategoryFilterChange = (categoryId) => {
+    setFilterCategory(categoryId);
+    setShowCategoryDropdown(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      try {
+        const response = await fetch(`http://localhost:8080/api/auth/users/${user.id}`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          addToast(result.message || "Account deleted successfully", "success");
+          logout();
+          navigate("/");
+        } else {
+          addToast(result.message || "Failed to delete account", "error");
+        }
+      } catch (error) {
+        console.error("Error deleting account:", error);
+        addToast("Error deleting account. Please try again.", "error");
+      }
+    }
+  };
+
+  const loadUserPosts = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      const url = `http://localhost:8080/api/social/posts/user/${user.id}`;
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        let postsData = await response.json();
+        
+        // DEBUG: Check if category data is being received
+        console.log("User posts from API:", postsData);
+        if (postsData.length > 0) {
+          console.log("First post category:", postsData[0].category);
+        }
+        
+        // Enhanced category handling - ensure all posts have proper category data
+        const postsWithFormattedData = postsData.map(post => ({
+          ...post,
+          comments: Array.isArray(post.comments) ? post.comments : [],
+          likeCount: post.likeCount || 0,
+          commentCount: Array.isArray(post.comments) ? post.comments.length : 0
+        }));
+        
+        setAllUserPosts(postsWithFormattedData);
+        setUserPosts(postsWithFormattedData);
+      } else {
+        console.error('Failed to load posts:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading user posts:', error);
+      addToast("Error loading your posts", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePost = async () => {
+    if (!user || !user.id) {
+      addToast("You must be logged in to post", "error");
+      return;
+    }
+    
+    const text = postText.trim();
+    if (!text) return;
+
+    try {
+      const postData = {
+        content: text,
+        userId: user.id
+      };
+      
+      // Automatically assign the current category if filtered (not "all")
+      if (filterCategory !== "all") {
+        postData.categoryId = parseInt(filterCategory);
+      }
+
+      const response = await fetch('http://localhost:8080/api/social/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(postData)
+      });
+
+      if (response.ok) {
+        const newPost = await response.json();
+        
+        // Add category info to the new post if we have it
+        if (filterCategory !== "all") {
+          const category = categories.find(c => c.id === parseInt(filterCategory));
+          newPost.category = category;
+        }
+        
+        // Update both all posts and filtered posts
+        setAllUserPosts(prev => [newPost, ...prev]);
+        
+        // If we're in "all" mode or the post matches the current filter, add it to displayed posts
+        if (filterCategory === "all" || (newPost.category && newPost.category.id === parseInt(filterCategory))) {
+          setUserPosts(prev => [newPost, ...prev]);
+        }
+        
+        setPostText("");
+        addToast("Post created successfully!", "success");
+      } else {
+        const errorData = await response.json();
+        addToast(errorData.message || "Failed to create post", "error");
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      addToast("Error creating post", "error");
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (window.confirm("Are you sure you want to delete this post?")) {
+      try {
+        const userData = JSON.parse(localStorage.getItem("user"));
+
+        const response = await fetch(`http://localhost:8080/api/social/posts/${postId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: userData.id
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          setAllUserPosts(prev => prev.filter(post => post.id !== postId));
+          setUserPosts(prev => prev.filter(post => post.id !== postId));
+          addToast(result.message || "Post deleted successfully", "success");
+        } else {
+          addToast(result.error || "Failed to delete post", "error");
+        }
+      } catch (error) {
+        console.error('Error deleting post:', error);
+        addToast("Error deleting post", "error");
+      }
+    }
+  };
+
+  const handleCommentPost = async (postId, commentText) => {
+    if (!commentText.trim()) return;
+
+    try {
+      const response = await fetch('http://localhost:8080/api/social/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: commentText,
+          userId: user.id,
+          postId: postId
+        })
+      });
+
+      if (response.ok) {
+        addToast("Comment added successfully!", "success");
+        loadUserPosts();
+      } else {
+        addToast("Failed to add comment", "error");
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      addToast("Error adding comment", "error");
+    }
+  };
+
+  const handleLikePost = async (postId) => {
+    try {
+      const response = await fetch('http://localhost:8080/api/social/likes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          postId: postId
+        })
+      });
+
+      if (response.ok) {
+        loadUserPosts();
+      }
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
+  };
+
+  const handleLikeComment = async (commentId) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/social/comments/${commentId}/likes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id
+        })
+      });
+
+      if (response.ok) {
+        loadUserPosts();
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+    }
+  };
+
+  const handleLikeReply = async (replyId) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/social/replies/${replyId}/likes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id
+        })
+      });
+
+      if (response.ok) {
+        loadUserPosts();
+      } else {
+        console.error('Failed to like reply');
+      }
+    } catch (error) {
+      console.error('Error liking reply:', error);
+    }
+  };
+
+  const handleReplyToComment = async (commentId, replyText) => {
+    if (!replyText.trim()) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/social/comments/${commentId}/replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: replyText,
+          userId: user.id
+        })
+      });
+
+      const responseText = await response.text();
+      let data;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        if (!response.ok) {
+          throw new Error(responseText || `Server error: ${response.status}`);
+        }
+        data = { message: responseText };
+      }
+
+      if (response.ok) {
+        addToast("Reply posted successfully!", "success");
+        loadUserPosts();
+      } else {
+        const errorMsg = data.error || data.message || "Failed to add reply";
+        addToast(errorMsg, "error");
+      }
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      addToast(error.message || "Error adding reply. Please try again.", "error");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) return;
+    try {
+      const userData = JSON.parse(localStorage.getItem("user"));
+      
+      const response = await fetch(`http://localhost:8080/api/social/comments/${commentId}?userId=${userData.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (response.ok) {
+        addToast("Comment deleted successfully", "success");
+        loadUserPosts();
+      } else {
+        const data = await response.json();
+        addToast(data.message || "Failed to delete comment", "error");
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      addToast("Error deleting comment. Please try again.", "error");
+    }
+  };
+
+  const handleDeleteReply = async (replyId) => {
+    if (!window.confirm("Are you sure you want to delete this reply?")) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/social/replies/${replyId}?userId=${user.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        addToast("Reply deleted successfully!", "success");
+        loadUserPosts();
+      } else {
+        addToast(data.message || "Failed to delete reply", "error");
+      }
+    } catch (error) {
+      console.error("Error deleting reply:", error);
+      addToast("Network error. Could not delete reply.", "error");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="hp-container">
+        <div className="d-flex justify-content-center align-items-center min-vh-100">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hp-container">
+      <div className="hp-home d-flex flex-column min-vh-100">
+        <nav className="navbar navbar-expand-lg hp-navbar-custom" style={{ position: "sticky", top: 0, zIndex: 1030 }}>
+          <div className="container">
+            <Link className="hp-navbar-brand navbar-brand" to="/home">
+              <i className="bi bi-mortarboard-fill"></i> Filter X
+            </Link>
+
+            <button
+              className="navbar-toggler"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navbarNav"
+              aria-controls="navbarNav"
+              aria-expanded="false"
+              aria-label="Toggle navigation"
+              style={{ borderColor: "#d4af37" }}
+            >
+              <i className="bi bi-list" style={{ color: "#d4af37", fontSize: "1.5rem" }}></i>
+            </button>
+
+            <div className="collapse navbar-collapse" id="navbarNav">
+              <ul className="hp-navbar-nav navbar-nav ms-auto align-items-lg-center">
+                <li className="hp-nav-item nav-item">
+                  <Link className="hp-nav-link nav-link" to="/home">
+                    Home
+                  </Link>
+                </li>
+                <li className="hp-nav-item nav-item">
+                  <Link className="hp-nav-link nav-link" to="/about">
+                    About
+                  </Link>
+                </li>
+                <li className="hp-nav-item nav-item">
+                  <span className="hp-nav-link nav-link text-warning">
+                    Profile
+                  </span>
+                </li>
+                <li className="hp-nav-item nav-item">
+                  <Link className="hp-nav-link nav-link" to="/notifications">
+                    Notifications
+                  </Link>
+                </li>
+                <li className="hp-nav-item nav-item">
+                  <a className="hp-nav-link nav-link" href="#" onClick={handleLogout}>
+                    Logout
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+
+        <main className="hp-main container-fluid flex-grow-1 py-3 d-flex flex-column">
+          <div className="hp-content-wrapper">
+            <header className="hp-page-header">My Profile</header>
+            <div className="hp-page-tagline">Your personal space on Filter X</div>
+
+            <section className="hp-glass-card d-flex align-items-center mb-4">
+              <img
+                src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+                alt="Profile"
+                className="hp-profile-img me-4"
+              />
+              <div className="flex-grow-1">
+                <div className="hp-username">{user?.username || "User"}</div>
+                <div className="hp-meta">{user?.email || ""}</div>
+                <div className="hp-meta">{user?.fullName || ""}</div>
+              </div>
+              <div className="ms-auto d-flex flex-column gap-2">
+                <Link to="/edit-profile" className="hp-btn hp-btn-outline-custom btn">
+                  Edit Profile
+                </Link>
+                <button
+                  onClick={handleDeleteAccount}
+                  className="edpd-btn-outline-custom btn"
+                >
+                  Delete Account
+                </button>
+              </div>
+            </section>
+
+            {/* Category Filter Section */}
+            <section className="hp-glass-card mb-4">
+              <div className="d-flex justify-content-between align-items-center">
+                <h5>Filter My Posts by Category</h5>
+                <div className="dropdown">
+                  <button 
+                    className="btn btn-outline-secondary dropdown-toggle"
+                    type="button"
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  >
+                    {filterCategory === "all" 
+                      ? "All Categories" 
+                      : categories.find(c => c.id === parseInt(filterCategory))?.name || "Select Category"}
+                  </button>
+                  {showCategoryDropdown && (
+                    <div className="dropdown-menu show" style={{display: 'block'}}>
+                      <button 
+                        className="dropdown-item" 
+                        onClick={() => handleCategoryFilterChange("all")}
+                      >
+                        All Categories
+                      </button>
+                      {categories.map(category => (
+                        <button
+                          key={category.id}
+                          className="dropdown-item"
+                          onClick={() => handleCategoryFilterChange(category.id.toString())}
+                          style={{ color: category.color || '#6c757d' }}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {currentCategory && (
+                <div className="mt-3">
+                  <p className="mb-1">Currently viewing posts in: <strong>{currentCategory.name}</strong></p>
+                  <p className="mb-0 small text-muted">
+                    New posts will be automatically added to this category.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* Post Creation Section */}
+            <section className="hp-glass-card mb-4">
+              <textarea
+                id="hp-postText"
+                placeholder={currentCategory ? `What's on your mind about ${currentCategory.name}?` : "What's on your mind?"}
+                rows="4"
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                className="w-100"
+              ></textarea>
+              
+              {currentCategory && (
+                <div className="mt-2 small text-muted">
+                  <i className="bi bi-info-circle me-1"></i>
+                  This post will be added to the <strong>{currentCategory.name}</strong> category.
+                </div>
+              )}
+
+              <div className="d-flex justify-content-end mt-3">
+                <button onClick={handlePost} className="hp-btn hp-btn-glass btn">
+                  <i className="bi bi-feather me-2"></i>Post
+                </button>
+              </div>
+            </section>
+
+            <section className="hp-posts-container">
+              <h3 className="mb-4">
+                My Posts ({userPosts.length})
+                {currentCategory && <span className="ms-2 text-muted small">in {currentCategory.name}</span>}
+              </h3>
+
+              {userPosts.length > 0 ? (
+                userPosts.map((post) => (
+                  <ProfilePost
+                    key={post.id}
+                    post={post}
+                    user={user}
+                    onDeletePost={handleDeletePost}
+                    onLikePost={handleLikePost}
+                    onCommentPost={handleCommentPost}
+                    onLikeComment={handleLikeComment}
+                    onLikeReply={handleLikeReply}
+                    onReplyToComment={handleReplyToComment}
+                    onDeleteComment={handleDeleteComment}
+                    onDeleteReply={handleDeleteReply}
+                  />
+                ))
+              ) : (
+                <div className="hp-glass-card text-center py-5 d-flex flex-column justify-content-center">
+                  <i className="bi bi-chat-square-text display-4 text-muted mb-3"></i>
+                  <h5 className="mt-3">No posts yet</h5>
+                  <p className="text-muted">
+                    {currentCategory 
+                      ? `Share your thoughts about ${currentCategory.name}!` 
+                      : "Share your thoughts with the community!"}
+                  </p>
+                </div>
+              )}
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLikeComment, onLikeReply, onReplyToComment, onDeleteComment, onDeleteReply }) {
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentReplies, setCommentReplies] = useState({});
+
+  // DEBUG: Check category data
+  console.log("ProfilePost category:", post.category);
+
+  useEffect(() => {
+    const loadAllReplies = async () => {
+      if (post.comments && post.comments.length > 0) {
+        for (const comment of post.comments) {
+          try {
+            const response = await fetch(`http://localhost:8080/api/social/comments/${comment.id}/replies`);
+            if (response.ok) {
+              const replies = await response.json();
+              setCommentReplies(prev => ({...prev, [comment.id]: replies}));
+            }
+          } catch (error) {
+            console.error('Error loading replies for comment:', comment.id, error);
+          }
+        }
+      }
+    };
+
+    loadAllReplies();
+  }, [post.comments]);
+
+  const submitComment = () => {
+    if (commentText.trim()) {
+      onCommentPost(post.id, commentText);
+      setCommentText("");
+      setShowCommentBox(false);
+    }
+  };
+
+  const getPostLikeCount = () => post.likeCount ?? 0;
+
+  const getPostCommentCount = () => {
+    if (typeof post.commentCount === 'number') {
+      return post.commentCount;
+    } else if (Array.isArray(post.comments)) {
+      return post.comments.length;
+    }
+    return 0;
+  };
+
+  return (
+    <article className="hp-glass-card hp-post mb-3 position-relative">
+      <button
+        className="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2"
+        onClick={() => onDeletePost(post.id)}
+        title="Delete post"
+      >
+        <i className="bi bi-trash"></i>
+      </button>
+
+      <div className="d-flex align-items-center mb-3">
+        <img
+          src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+          alt="Profile"
+          className="hp-profile-mini me-2"
+        />
+        <strong className="hp-username">{user?.username || "User"}</strong>
+        
+        {/* Display category badge with color - using optional chaining for safety */}
+        {post.category && post.category.name && (
+          <span 
+            className="badge ms-2"
+            style={{ 
+              backgroundColor: post.category.color || '#6c757d',
+              color: '#fff'
+            }}
+          >
+            #{post.category.name}
+          </span>
+        )}
+        
+        <small className="text-muted ms-auto">
+          {post.createdAt ? new Date(post.createdAt).toLocaleString() : "Recently"}
+        </small>
+      </div>
+      <p>{post.content}</p>
+
+      <div className="d-flex gap-2 flex-wrap hp-action-buttons mb-3">
+        <button
+          className="hp-btn hp-btn-outline-success hp-btn-outline-custom btn btn-sm"
+          title="Like"
+          onClick={() => onLikePost(post.id)}
+        >
+          <i className="bi bi-hand-thumbs-up"></i> Like ({getPostLikeCount()})
+        </button>
+        <button
+          className="hp-btn hp-btn-outline-secondary hp-btn-outline-custom btn btn-sm"
+          title="Comment"
+          onClick={() => setShowCommentBox(!showCommentBox)}
+        >
+          <i className="bi bi-chat-dots"></i> Comment ({getPostCommentCount()})
+        </button>
+      </div>
+
+      <section className="hp-comments">
+        {showCommentBox && (
+          <section className="hp-comment-box">
+            <textarea
+              className="form-control mb-2"
+              placeholder="Write a comment..."
+              rows="2"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submitComment();
+                }
+              }}
+            ></textarea>
+            <div className="d-flex gap-2">
+              <button
+                className="hp-btn hp-btn-outline-secondary btn btn-sm"
+                onClick={() => setShowCommentBox(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="hp-btn hp-btn-glass btn btn-sm flex-grow-1"
+                onClick={submitComment}
+                disabled={!commentText.trim()}
+              >
+                <i className="bi bi-send me-1"></i>Post Comment
+              </button>
+            </div>
+          </section>
+        )}
+
+        {post.comments?.map((comment) => (
+          <ProfileComment
+            key={comment.id}
+            comment={comment}
+            user={user}
+            onLikeComment={onLikeComment}
+            onLikeReply={onLikeReply}
+            onReplyToComment={onReplyToComment}
+            onDeleteComment={onDeleteComment}
+            onDeleteReply={onDeleteReply}
+            replies={commentReplies[comment.id] || []}
+          />
+        ))}
+      </section>
+    </article>
+  );
+}
+
+function ProfileComment({ comment, user, onLikeComment, onLikeReply, onReplyToComment, onDeleteComment, onDeleteReply, replies = [] }) {
+  const [showReplyBox, setShowReplyBox] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [showReplies, setShowReplies] = useState(false);
+
+  const safeReplies = Array.isArray(replies) ? replies : [];
+  
+  const getCommentLikeCount = () => {
+    if (typeof comment.likeCount === 'number') {
+      return comment.likeCount;
+    } else if (Array.isArray(comment.likes)) {
+      return comment.likes.length;
+    }
+    return 0;
+  };
+
+  const submitReply = () => {
+    if (replyText.trim()) {
+      onReplyToComment(comment.id, replyText);
+      setReplyText("");
+      setShowReplyBox(false);
+    }
+  };
+
+  return (
+    <article className="hp-comment mb-2">
+      <div className="d-flex align-items-center">
+        <img
+          src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+          alt="Profile"
+          className="hp-profile-mini me-2"
+          style={{width: "30px", height: "30px"}}
+        />
+        <strong className="hp-username me-2">{comment.user?.username || "User"}:</strong>
+        <span>{comment.content}</span>
+      </div>
+      <small className="text-muted">
+        {new Date(comment.createdAt).toLocaleString()}
+      </small>
+
+      <div className="d-flex gap-2 mt-2">
+        <button
+          className="cmrp-like btn-sm"
+          title="Like comment"
+          onClick={() => onLikeComment(comment.id)}
+        >
+          <i className="bi bi-hand-thumbs-up"></i> ({getCommentLikeCount()})
+        </button>
+        <button
+          className="cmrp-reply btn-sm"
+          title="Reply"
+          onClick={() => setShowReplyBox(!showReplyBox)}
+        >
+          <i className="bi bi-reply"></i> Reply
+        </button>
+        {comment.user?.id === user?.id && (
+          <button
+            className="btn-sm cmrp-delete"
+            title="Delete comment"
+            onClick={() => onDeleteComment(comment.id)}
+          >
+            <i className="bi bi-trash"></i> Delete
+          </button>
+        )}
+        {safeReplies.length > 0 && (
+          <button
+            className="hp-btn hp-btn-outline-info btn-sm"
+            onClick={() => setShowReplies(!showReplies)}
+          >
+            <i className="bi bi-chat"></i> {safeReplies.length} {showReplies ? 'Hide' : 'Show'} replies
+          </button>
+        )}
+      </div>
+
+      {showReplyBox && (
+        <div className="hp-reply-box mt-2">
+          <textarea
+            className="form-control mb-2"
+            placeholder="Write a reply..."
+            rows="1"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitReply();
+              }
+            }}
+          ></textarea>
+          <div className="d-flex gap-2">
+            <button
+              className="hp-btn hp-btn-outline-secondary btn-sm"
+              onClick={() => setShowReplyBox(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="hp-btn hp-btn-glass btn-sm"
+              onClick={submitReply}
+              disabled={!replyText.trim()}
+            >
+              <i className="bi bi-send me-1"></i>Reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {safeReplies.length > 0 && showReplies && (
+        <div className="hp-replies mt-2">
+          {safeReplies.map((reply) => (
+            <div key={reply.id} className="hp-reply mb-1">
+              <div className="d-flex align-items-center">
+                <img
+                  src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+                  alt="Profile"
+                  className="hp-profile-mini me-2"
+                  style={{width: "25px", height: "25px"}}
+                />
+                <strong className="hp-username me-2">{reply.user?.username || "User"}:</strong>
+                <span>{reply.content}</span>
+              </div>
+              <small className="text-muted">
+                {new Date(reply.createdAt).toLocaleString()}
+              </small>
+
+              <div className="d-flex gap-2 mt-1">
+                <button
+                  className="btn-sm cmrp-like"
+                  title="Like reply"
+                  onClick={() => onLikeReply(reply.id)}
+                >
+                  <i className="bi bi-hand-thumbs-up"></i> ({reply.likeCount || 0})
+                </button>
+                {reply.user?.id === user?.id && (
+                  <button
+                    className="btn-sm cmrp-delete"
+                    title="Delete reply"
+                    onClick={() => onDeleteReply(reply.id)}
+                  >
+                    <i className="bi bi-trash"></i> Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+export default Profile;
