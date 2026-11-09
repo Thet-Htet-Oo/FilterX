@@ -19,6 +19,18 @@ The project focuses on content filtering and classification concepts.
 However, the filtering model is currently very limited because it was trained locally with a small dataset and limited resources.
 As a result, the filtering accuracy and overall performance are not yet reliable for real-world production use.
 
+## Features
+
+- **Create Post:** Users can publish new posts.
+- **View Posts:** Users can browse posts.
+- **Update Posts:** Users can edit their existing posts.
+- **Delete Posts:** Users can remove their posts.
+- **Comment on Posts:** Users can add comments to posts and participate in discussions.
+- **Manage Comments:** Users can update and delete their comments.
+- **Reply to Comments** Users can reply to existing comments to support discussions and interactions.
+- **Notification System:** Notifies users about relevant activities and interactions on the platform.
+- **Word Filtering:** Includes a basic word-filtering mechanism to detect inappropriate or rude language in posts, comments, and replies.
+
 ## Current Limitations
 
 - Limited training dataset
