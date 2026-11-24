@@ -79,6 +79,55 @@
   box-sizing: border-box;
 }
 
+.hp-navbar-custom .hp-logout-btn {
+  padding: 0.32rem 0.95rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 9999px;
+  color: var(--hp-light-bg);
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(212, 175, 55, 0.6);
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hp-navbar-custom .hp-logout-btn:hover {
+  color: var(--hp-navy);
+  background-color: var(--hp-gold);
+  border-color: var(--hp-gold);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+.hp-notif-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: #dc3545;
+  color: #fff;
+  font-family: 'Lato', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--hp-navy);
+  animation: hp-notif-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hp-notif-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--hp-navy); }
+  50% { box-shadow: 0 0 0 2px var(--hp-navy), 0 0 0 5px rgba(220, 53, 69, 0.35); }
+}
+
 .hp-page-header {
   font-family: 'Merriweather', serif;
   font-weight: 700;
@@ -119,6 +168,11 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
   border-color: var(--hp-gold);
   cursor: default;
+}
+
+.hp-compose-card {
+  background: #f1f2f4;
+  border-color: #c9ccd1;
 }
 
 .hp-profile-img {
@@ -183,20 +237,156 @@
   border: none;
   color: var(--hp-navy);
   font-weight: 700;
-  border-radius: 50px;
+  border-radius: 9999px;
   user-select: none;
   transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-  font-size: 1.1rem;
-  padding: 0.7rem;
+  font-size: 0.98rem;
+  padding: 0.45rem 1.35rem;
+  min-height: 38px;
   margin: 0;
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.3;
+}
+
+.hp-btn-glass.btn-sm {
+  font-size: 0.82rem;
+  padding: 0.28rem 0.85rem;
+  min-height: 30px;
 }
 
 .hp-btn-glass:hover {
   background: #b38f14;
   box-shadow: 0 0 15px #b38f14cc;
-  transform: scale(1.07);
+  transform: scale(1.05);
   color: #fff;
+}
+
+.hp-category-filter-btn {
+  border-radius: 9999px !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.6) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  color: var(--hp-navy) !important;
+  font-weight: 600 !important;
+  padding: 0.42rem 1.1rem !important;
+  transition: all 0.25s ease !important;
+}
+
+.hp-category-filter-btn:hover,
+.hp-category-filter-btn:focus {
+  background-color: #e9ecef !important;
+  border-color: #ced4da !important;
+  color: var(--hp-navy) !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.hp-category-filter-menu .dropdown-item {
+  transition: all 0.25s ease;
+}
+
+.hp-category-filter-menu .dropdown-item:hover,
+.hp-category-filter-menu .dropdown-item:focus,
+.hp-category-filter-menu .dropdown-item.active,
+.hp-category-filter-menu .dropdown-item:active {
+  background-color: #e9ecef !important;
+  color: var(--hp-navy) !important;
+}
+
+/* Attachment Pill Buttons */
+.hp-attach-btn {
+  border-radius: 9999px !important;
+  padding: 0.42rem 1.1rem !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.5) !important;
+  color: var(--hp-navy) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  transition: all 0.25s ease !important;
+  line-height: 1.3 !important;
+  min-height: 38px !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+.hp-attach-btn:hover:not(:disabled) {
+  background-color: #e9ecef !important;
+  border-color: #ced4da !important;
+  color: var(--hp-navy) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.hp-attach-btn:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  border-color: #dee2e6 !important;
+  background-color: #f8f9fa !important;
+  color: #6c757d !important;
+}
+
+.hp-attach-btn-sm {
+  border-radius: 9999px !important;
+  padding: 0.26rem 0.75rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.5) !important;
+  color: var(--hp-navy) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  transition: all 0.25s ease !important;
+  line-height: 1.2 !important;
+  min-height: 30px !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+.hp-attach-btn-sm:hover:not(:disabled) {
+  background-color: #e9ecef !important;
+  border-color: #ced4da !important;
+  color: var(--hp-navy) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.hp-attach-btn-sm:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  border-color: #dee2e6 !important;
+  background-color: #f8f9fa !important;
+}
+
+/* Category Pill Select Dropdown */
+.hp-category-select {
+  border-radius: 9999px !important;
+  max-width: 230px !important;
+  padding-left: 14px !important;
+  padding-right: 32px !important;
+  border: 1.5px solid rgba(212, 175, 55, 0.6) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  color: var(--hp-navy) !important;
+  background-color: #fff !important;
+  transition: all 0.25s ease !important;
+  height: 34px !important;
+}
+
+.hp-category-select:hover {
+  background-color: #e9ecef !important;
+  color: var(--hp-navy) !important;
+  border-color: #ced4da !important;
+}
+
+.hp-category-select:focus {
+  border-color: var(--hp-gold) !important;
+  box-shadow: 0 0 0 0.2rem rgba(212, 175, 55, 0.25) !important;
 }
 
 #hp-postText {
@@ -627,4 +817,364 @@
 
 .toast.bg-warning .btn-close {
   filter: invert(1);
+}
+
+
+/* ==========================================================================
+   FilterX Attachment & Photo Gallery Styles
+   ========================================================================== */
+
+/* Photo Grid Layouts */
+.post-photo-grid {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  width: 100%;
+}
+
+.post-photo-grid.grid-1 {
+  grid-template-columns: 1fr;
+  max-height: 420px;
+}
+
+.post-photo-grid.grid-2 {
+  grid-template-columns: 1fr 1fr;
+  max-height: 320px;
+}
+
+.post-photo-grid.grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+  max-height: 260px;
+}
+
+.post-photo-item {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: #f0f2f5;
+  cursor: pointer;
+  position: relative;
+}
+
+.post-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.post-photo-item:hover .post-photo-img {
+  transform: scale(1.03);
+  filter: brightness(0.95);
+}
+
+/* Downloadable File Cards */
+.post-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.post-file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(11, 37, 69, 0.15);
+  border-radius: 8px;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.post-file-card:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: var(--hp-navy);
+  box-shadow: 0 2px 8px rgba(11, 37, 69, 0.12);
+}
+
+.post-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-file-icon {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background-color: #eef2f7;
+  flex-shrink: 0;
+}
+
+.post-file-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.post-file-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--hp-dark-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-file-size {
+  font-size: 0.78rem;
+  color: #6c757d;
+}
+
+.post-file-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--hp-navy);
+  background-color: transparent;
+  border: 1px solid var(--hp-navy);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.post-file-download-btn:hover {
+  background-color: var(--hp-navy);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Create & Edit Post Previews */
+.attachment-previews-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(240, 242, 245, 0.6);
+  border-radius: 8px;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+}
+
+.photo-thumbnails-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.thumbnail-preview-wrap {
+  position: relative;
+  width: 75px;
+  height: 75px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.thumbnail-preview-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.thumbnail-remove-btn:hover {
+  background: #dc3545;
+}
+
+.file-chips-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  max-width: 260px;
+}
+
+.file-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chip-remove {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.file-chip-remove:hover {
+  color: #dc3545;
+}
+
+/* Comment Attachment Styling */
+.comment-attachment-wrap {
+  margin-top: 8px;
+}
+
+.comment-photo-thumbnail {
+  max-height: 150px;
+  max-width: 220px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.comment-photo-thumbnail:hover {
+  transform: scale(1.02);
+}
+
+.comment-file-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  text-decoration: none;
+  color: var(--hp-dark-text);
+  margin-top: 4px;
+  transition: background-color 0.2s;
+}
+
+.comment-file-badge:hover {
+  background: #e9ecef;
+  color: var(--hp-navy);
+  text-decoration: none;
+}
+
+/* Lightbox Modal */
+.lightbox-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lightbox-content img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: -40px;
+  right: -10px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 2.2rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.lightbox-close-btn:hover {
+  color: var(--hp-gold);
+}
+
+.lightbox-caption {
+  color: #fff;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Edit Post & Comment Modals */
+.edit-post-card {
+  background: #ffffff;
+  border: 1px solid rgba(11, 37, 69, 0.2);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+}
+
+/* Category Pill Badges */
+.category-pill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 50rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
+.category-pill:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
 }

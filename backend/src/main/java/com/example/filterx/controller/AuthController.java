@@ -122,19 +122,46 @@ public ResponseEntity<?> updateUser(
     // Hide password in response
     updatedUser.setPassword(null);
 
-    return ResponseEntity.ok(Map.of(
-        "success", true,
-        "message", "User updated successfully",
-        "user", Map.of(
-            "id", updatedUser.getId(),
-            "username", updatedUser.getUsername(),
-            "email", updatedUser.getEmail(),
-            "fullName", updatedUser.getFullName(),
-            "phoneNumber", updatedUser.getPhoneNumber(),
-            "createdAt", updatedUser.getCreatedAt(),
-            "updatedAt", updatedUser.getUpdatedAt()
-        )
-    ));
+    Map<String, Object> userMap = new HashMap<>();
+    userMap.put("id", updatedUser.getId());
+    userMap.put("username", updatedUser.getUsername());
+    userMap.put("email", updatedUser.getEmail());
+    userMap.put("fullName", updatedUser.getFullName());
+    userMap.put("phoneNumber", updatedUser.getPhoneNumber());
+    userMap.put("countryCode", updatedUser.getCountryCode());
+    userMap.put("createdAt", updatedUser.getCreatedAt());
+    userMap.put("updatedAt", updatedUser.getUpdatedAt());
+    userMap.put("hasProfilePicture", updatedUser.hasProfilePicture());
+    userMap.put("profilePictureUrl", updatedUser.getProfilePictureUrl());
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("success", true);
+    response.put("message", "User updated successfully");
+    response.put("user", userMap);
+
+    return ResponseEntity.ok(response);
+}
+
+@GetMapping("/users/{userId}")
+public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
+    Optional<User> userOpt = userService.getUserById(userId);
+    if (userOpt.isEmpty()) {
+        return ResponseEntity.status(404)
+                .body(Map.of("success", false, "message", "User not found"));
+    }
+    User user = userOpt.get();
+    Map<String, Object> userMap = new HashMap<>();
+    userMap.put("id", user.getId());
+    userMap.put("username", user.getUsername());
+    userMap.put("email", user.getEmail());
+    userMap.put("fullName", user.getFullName());
+    userMap.put("phoneNumber", user.getPhoneNumber());
+    userMap.put("countryCode", user.getCountryCode());
+    userMap.put("createdAt", user.getCreatedAt());
+    userMap.put("updatedAt", user.getUpdatedAt());
+    userMap.put("hasProfilePicture", user.hasProfilePicture());
+    userMap.put("profilePictureUrl", user.getProfilePictureUrl());
+    return ResponseEntity.ok(userMap);
 }
 
 

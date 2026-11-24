@@ -273,7 +273,9 @@ export default function LoginSignup() {
           <div className="ls-toggle">
             <div className="ls-toggle-panel ls-toggle-left">
               <h1>Welcome Back!</h1>
-              <p>Log in to share your thoughts and connect with fellow writers.</p>
+              <p>
+                Already have an account? Log in to stay connected and join the conversation.
+              </p>
               <button
                 type="button"
                 className="ls-hidden"
@@ -286,8 +288,7 @@ export default function LoginSignup() {
             <div className="ls-toggle-panel ls-toggle-right">
               <h1>Hello, Friend!</h1>
               <p>
-                Create an account to start sharing your texts and explore others'
-                work.
+                Create an account to share your ideas, photos, and files with the community.
               </p>
               <button
                 type="button"

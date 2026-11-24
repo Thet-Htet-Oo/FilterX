@@ -6,6 +6,7 @@ import Profile from "./Profile.jsx";
 import EditProfile from './EditProfile';
 import Notification from "./Notification.jsx";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
+import { NotificationProvider } from "./NotificationProvider.jsx";
 import { ToastProvider } from "./ToastContext.jsx";
 
 function AppRoutes() {
@@ -38,9 +39,11 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Router>
-          <AppRoutes />
-        </Router>
+        <NotificationProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </NotificationProvider>
       </AuthProvider>
     </ToastProvider>
   );

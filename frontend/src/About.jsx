@@ -1,33 +1,11 @@
 // src/components/About.jsx
-import React, { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "./AuthContext.jsx";
+import React from "react";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import './home.css';
+import Navbar from "./Navbar.jsx";
 
 const About = () => {
-    const navigate = useNavigate();
-    const { logout } = useAuth();
-  useEffect(() => {
-    // Load Bootstrap JS for navbar toggler and toast
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // Clean up the script when component unmounts
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
-
   const handleJoinClick = () => {
     const toastEl = document.createElement("div");
     toastEl.className =
@@ -55,13 +33,6 @@ const About = () => {
       {/* Inline Styles */}
       <style>{`
         h1,h2,h3 { font-family: "Merriweather", serif; color:#2c3e50; }
-        .navbar-custom { background-color: #0b2545; box-shadow: 0 3px 8px rgba(0,0,0,0.2); padding:1rem 0; font-family: 'Merriweather', serif; font-weight:700; }
-        .navbar-custom .navbar-brand { color: #d4af37; font-size:1.7rem; display:flex; align-items:center; gap:0.5rem; user-select:none; }
-        .navbar-custom .navbar-brand i { font-size:1.8rem; }
-        .navbar-custom .nav-link { color:#fdfaf6; font-weight:600; transition: color 0.3s ease; }
-        .navbar-custom .nav-link:hover { color:#d4af37; }
-        .navbar-custom .navbar-toggler { border: 1px solid #d4af37; }
-        .navbar-custom .navbar-toggler:focus { box-shadow: 0 0 0 0.2rem rgba(212, 175, 55, 0.25); }
         .hero { text-align:center; padding:100px 20px 80px; background: linear-gradient(135deg,#fefdc7,#fffde0,#feeec7); border-radius:0 0 50% 50% / 20%; position:relative; overflow:hidden; }
         .hero h1 { font-size:3rem; font-weight:700; color:#0b2545; }
         .hero p { max-width:700px; margin:15px auto; font-size:1.2rem; color:#1a1a1a; }
@@ -75,42 +46,7 @@ const About = () => {
         .stat-label { font-size:1rem; color:#555; }
       `}</style>
 
-      {/* Sticky Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-custom" 
-           style={{ position: 'sticky', top: 0, zIndex: 1030 }}>
-        <div className="container">
-          <Link className="navbar-brand" to="/home">
-            <i className="bi bi-mortarboard-fill"></i>
-            Filter X
-          </Link>
-          <button
-            className="navbar-toggler"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarNav"
-            aria-controls="navbarNav"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-            style={{ borderColor: "#d4af37" }}>
-            <i className="bi bi-list" style={{ color: "#d4af37", fontSize: "1.5rem" }}></i>
-          </button>
-          <div className="collapse navbar-collapse" id="navbarNav">
-            <ul className="navbar-nav ms-auto align-items-lg-center">
-              <li className="nav-item"><Link className="nav-link" to="/home">Home</Link></li>
-              <li className="nav-item "><Link className="nav-link" to="/about">
-                <span className="text-warning">About</span>
-              </Link></li>
-              <li className="nav-item"><Link className="nav-link" to="/profile">Profile</Link></li>
-              <li className="hp-nav-item nav-item">
-                                <Link className="hp-nav-link nav-link" to="/notifications">
-                                  Notifications
-                                </Link>
-                              </li>
-              <li className="nav-item"><a className="nav-link" href="#" onClick={handleLogout}>Logout</a></li>
-            </ul>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero */}
       <section className="hero">

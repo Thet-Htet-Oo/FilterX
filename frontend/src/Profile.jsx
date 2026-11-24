@@ -1,42 +1,45 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "./AuthContext.jsx";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "./ToastContext.jsx";
+import Navbar from "./Navbar.jsx";
+import {
+  AttachmentGallery,
+  FileList,
+  CommentAttachmentView,
+  LightboxModal,
+  formatFileSize,
+  getFileMeta,
+  validateSelectedFile
+} from "./AttachmentComponents.jsx";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./home.css";
+import { DEFAULT_AVATAR, getAvatarUrl } from "./avatarUtils.js";
 
 function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
+
   const [userPosts, setUserPosts] = useState([]);
   const [allUserPosts, setAllUserPosts] = useState([]);
   const [postText, setPostText] = useState("");
+  const [postCategoryId, setPostCategoryId] = useState("");
+  const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [photoPreviews, setPhotoPreviews] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isPosting, setIsPosting] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [filterCategory, setFilterCategory] = useState("all");
   const [currentCategory, setCurrentCategory] = useState(null);
 
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    addToast("You have been logged out successfully", "info");
-    navigate("/");
-  };
+  const photoInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadCategories();
@@ -48,14 +51,14 @@ function Profile() {
     }
   }, [user, categories]);
 
-  // FIXED: Safer filter that handles missing category data
+  // Safer filter that handles missing category data
   useEffect(() => {
     if (filterCategory === "all") {
       setUserPosts(allUserPosts);
     } else {
       const categoryId = parseInt(filterCategory);
       const filteredPosts = allUserPosts.filter(post => 
-        post.category?.id === categoryId  // Using optional chaining for safety
+        post.category?.id === categoryId
       );
       setUserPosts(filteredPosts);
     }
@@ -124,18 +127,12 @@ function Profile() {
       
       const response = await fetch(url);
       if (response.ok) {
-        let postsData = await response.json();
+        const postsData = await response.json();
         
-        // DEBUG: Check if category data is being received
-        console.log("User posts from API:", postsData);
-        if (postsData.length > 0) {
-          console.log("First post category:", postsData[0].category);
-        }
-        
-        // Enhanced category handling - ensure all posts have proper category data
         const postsWithFormattedData = postsData.map(post => ({
           ...post,
           comments: Array.isArray(post.comments) ? post.comments : [],
+          attachments: Array.isArray(post.attachments) ? post.attachments : [],
           likeCount: post.likeCount || 0,
           commentCount: Array.isArray(post.comments) ? post.comments.length : 0
         }));
@@ -153,6 +150,72 @@ function Profile() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Attachment Handlers for Create Post
+  // ---------------------------------------------------------------------------
+  const handlePhotoSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    if (selectedPhotos.length + files.length > 3) {
+      addToast("Maximum 3 photos allowed per post", "warning");
+      return;
+    }
+
+    const validNewPhotos = [];
+    const newPreviews = [];
+
+    for (const file of files) {
+      const check = validateSelectedFile(file, true);
+      if (!check.valid) {
+        addToast(check.error, "error");
+        continue;
+      }
+      validNewPhotos.push(file);
+      newPreviews.push(URL.createObjectURL(file));
+    }
+
+    setSelectedPhotos(prev => [...prev, ...validNewPhotos]);
+    setPhotoPreviews(prev => [...prev, ...newPreviews]);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  };
+
+  const removeSelectedPhoto = (index) => {
+    URL.revokeObjectURL(photoPreviews[index]);
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    if (selectedFiles.length + files.length > 3) {
+      addToast("Maximum 3 files allowed per post", "warning");
+      return;
+    }
+
+    const validNewFiles = [];
+    for (const file of files) {
+      const check = validateSelectedFile(file, false);
+      if (!check.valid) {
+        addToast(check.error, "error");
+        continue;
+      }
+      validNewFiles.push(file);
+    }
+
+    setSelectedFiles(prev => [...prev, ...validNewFiles]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeSelectedFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ---------------------------------------------------------------------------
+  // Create Post
+  // ---------------------------------------------------------------------------
   const handlePost = async () => {
     if (!user || !user.id) {
       addToast("You must be logged in to post", "error");
@@ -160,56 +223,72 @@ function Profile() {
     }
     
     const text = postText.trim();
-    if (!text) return;
+    if (!text && selectedPhotos.length === 0 && selectedFiles.length === 0) {
+      addToast("Post cannot be empty. Please enter text or attach photos/files.", "warning");
+      return;
+    }
 
+    setIsPosting(true);
     try {
-      const postData = {
-        content: text,
-        userId: user.id
-      };
-      
-      // Automatically assign the current category if filtered (not "all")
-      if (filterCategory !== "all") {
-        postData.categoryId = parseInt(filterCategory);
+      const formData = new FormData();
+      formData.append("userId", user.id);
+      if (text) formData.append("content", text);
+      const catToUse = postCategoryId || (filterCategory !== "all" ? filterCategory : null);
+      if (catToUse && catToUse !== "all" && catToUse !== "null" && catToUse !== "undefined") {
+        formData.append("categoryId", parseInt(catToUse));
       }
+
+      selectedPhotos.forEach(photo => formData.append("photos", photo));
+      selectedFiles.forEach(file => formData.append("files", file));
 
       const response = await fetch('http://localhost:8080/api/social/posts', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(postData)
+        body: formData
       });
 
+      const newPost = await response.json();
+
       if (response.ok) {
-        const newPost = await response.json();
-        
-        // Add category info to the new post if we have it
-        if (filterCategory !== "all") {
+        // Add category info if assigned
+        if (filterCategory !== "all" && !newPost.category) {
           const category = categories.find(c => c.id === parseInt(filterCategory));
           newPost.category = category;
         }
+
+        const formatted = {
+          ...newPost,
+          comments: Array.isArray(newPost.comments) ? newPost.comments : [],
+          attachments: Array.isArray(newPost.attachments) ? newPost.attachments : [],
+          likeCount: newPost.likeCount || 0,
+          commentCount: Array.isArray(newPost.comments) ? newPost.comments.length : 0
+        };
         
-        // Update both all posts and filtered posts
-        setAllUserPosts(prev => [newPost, ...prev]);
-        
-        // If we're in "all" mode or the post matches the current filter, add it to displayed posts
-        if (filterCategory === "all" || (newPost.category && newPost.category.id === parseInt(filterCategory))) {
-          setUserPosts(prev => [newPost, ...prev]);
+        setAllUserPosts(prev => [formatted, ...prev]);
+        if (filterCategory === "all" || (formatted.category && formatted.category.id === parseInt(filterCategory))) {
+          setUserPosts(prev => [formatted, ...prev]);
         }
         
         setPostText("");
+        setPostCategoryId("");
+        photoPreviews.forEach(url => URL.revokeObjectURL(url));
+        setSelectedPhotos([]);
+        setPhotoPreviews([]);
+        setSelectedFiles([]);
         addToast("Post created successfully!", "success");
       } else {
-        const errorData = await response.json();
-        addToast(errorData.message || "Failed to create post", "error");
+        addToast(newPost.message || newPost.error || "Failed to create post", "error");
       }
     } catch (error) {
       console.error('Error creating post:', error);
       addToast("Error creating post", "error");
+    } finally {
+      setIsPosting(false);
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Delete Post
+  // ---------------------------------------------------------------------------
   const handleDeletePost = async (postId) => {
     if (window.confirm("Are you sure you want to delete this post?")) {
       try {
@@ -221,7 +300,7 @@ function Profile() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            userId: userData.id
+            userId: userData?.id || user?.id
           })
         });
 
@@ -241,31 +320,169 @@ function Profile() {
     }
   };
 
-  const handleCommentPost = async (postId, commentText) => {
-    if (!commentText.trim()) return;
-
+  // ---------------------------------------------------------------------------
+  // Edit Post (Full Attachment CRUD)
+  // ---------------------------------------------------------------------------
+  const handleEditPost = async (postId, updatedContent, removeAttachmentIds, newPhotos, newFiles, categoryId) => {
     try {
+      const userData = JSON.parse(localStorage.getItem("user")) || user;
+      const formData = new FormData();
+      formData.append("userId", userData.id);
+      if (updatedContent !== undefined && updatedContent !== null) {
+        formData.append("content", updatedContent);
+      }
+      if (categoryId !== undefined && categoryId !== null && categoryId !== "" && categoryId !== "all" && categoryId !== "null" && categoryId !== "undefined") {
+        formData.append("categoryId", parseInt(categoryId));
+      } else if (categoryId === "" || categoryId === 0 || categoryId === "0") {
+        formData.append("categoryId", "0");
+      }
+      if (removeAttachmentIds && removeAttachmentIds.length > 0) {
+        removeAttachmentIds.forEach(id => formData.append("removeAttachmentIds", id));
+      }
+      if (newPhotos && newPhotos.length > 0) {
+        newPhotos.forEach(p => formData.append("photos", p));
+      }
+      if (newFiles && newFiles.length > 0) {
+        newFiles.forEach(f => formData.append("files", f));
+      }
+
+      const response = await fetch(`http://localhost:8080/api/social/posts/${postId}`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        const formatted = {
+          ...data,
+          comments: Array.isArray(data.comments) ? data.comments : [],
+          attachments: Array.isArray(data.attachments) ? data.attachments : [],
+          likeCount: data.likeCount || 0,
+          commentCount: Array.isArray(data.comments) ? data.comments.length : 0
+        };
+
+        setAllUserPosts(prev => prev.map(p => (p.id === postId ? formatted : p)));
+        setUserPosts(prev => prev.map(p => (p.id === postId ? formatted : p)));
+        addToast("Post updated successfully!", "success");
+        return { success: true };
+      } else {
+        const errorMsg = data.message || data.error || "Failed to update post";
+        addToast(errorMsg, "error");
+        return { success: false, error: errorMsg };
+      }
+    } catch (err) {
+      console.error("Error updating post:", err);
+      addToast("Error updating post. Please try again.", "error");
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Comments: Create, Edit & Auto-Delete
+  // ---------------------------------------------------------------------------
+  const handleCommentPost = async (postId, commentText, photoFile, fileFile) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem("user")) || user;
+      const formData = new FormData();
+      formData.append("userId", userData.id);
+      formData.append("postId", postId);
+      if (commentText) formData.append("content", commentText);
+      if (photoFile) formData.append("photo", photoFile);
+      if (fileFile) formData.append("file", fileFile);
+
       const response = await fetch('http://localhost:8080/api/social/comments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: commentText,
-          userId: user.id,
-          postId: postId
-        })
+        body: formData
       });
 
       if (response.ok) {
+        const newComment = await response.json();
         addToast("Comment added successfully!", "success");
-        loadUserPosts();
+
+        const updatePostState = (post) => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              comments: [...(post.comments || []), newComment],
+              commentCount: (post.commentCount || 0) + 1
+            };
+          }
+          return post;
+        };
+
+        setAllUserPosts(prev => prev.map(updatePostState));
+        setUserPosts(prev => prev.map(updatePostState));
+        return true;
       } else {
-        addToast("Failed to add comment", "error");
+        const data = await response.json();
+        addToast(data.message || data.error || "Failed to add comment", "error");
+        return false;
       }
     } catch (error) {
       console.error('Error adding comment:', error);
       addToast("Error adding comment", "error");
+      return false;
+    }
+  };
+
+  const handleEditComment = async (commentId, postId, updatedText, deleteAttachment, newPhoto, newFile) => {
+    try {
+      const userData = JSON.parse(localStorage.getItem("user")) || user;
+      const formData = new FormData();
+      formData.append("userId", userData.id);
+      if (updatedText !== undefined && updatedText !== null) {
+        formData.append("content", updatedText);
+      }
+      if (deleteAttachment) {
+        formData.append("deleteAttachment", "true");
+      }
+      if (newPhoto) formData.append("photo", newPhoto);
+      if (newFile) formData.append("file", newFile);
+
+      const response = await fetch(`http://localhost:8080/api/social/comments/${commentId}`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        if (data.deleted) {
+          addToast("Comment was deleted because its attachment was removed.", "info");
+          const removeComment = (post) => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                comments: (post.comments || []).filter(c => c.id !== commentId),
+                commentCount: Math.max((post.commentCount || 1) - 1, 0)
+              };
+            }
+            return post;
+          };
+          setAllUserPosts(prev => prev.map(removeComment));
+          setUserPosts(prev => prev.map(removeComment));
+        } else {
+          addToast("Comment updated successfully!", "success");
+          const updateComment = (post) => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                comments: (post.comments || []).map(c => (c.id === commentId ? data : c))
+              };
+            }
+            return post;
+          };
+          setAllUserPosts(prev => prev.map(updateComment));
+          setUserPosts(prev => prev.map(updateComment));
+        }
+        return true;
+      } else {
+        addToast(data.message || data.error || "Failed to update comment", "error");
+        return false;
+      }
+    } catch (err) {
+      console.error("Error editing comment:", err);
+      addToast("Error updating comment", "error");
+      return false;
     }
   };
 
@@ -375,7 +592,7 @@ function Profile() {
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm("Are you sure you want to delete this comment?")) return;
     try {
-      const userData = JSON.parse(localStorage.getItem("user"));
+      const userData = JSON.parse(localStorage.getItem("user")) || user;
       
       const response = await fetch(`http://localhost:8080/api/social/comments/${commentId}?userId=${userData.id}`, {
         method: 'DELETE',
@@ -435,67 +652,20 @@ function Profile() {
   return (
     <div className="hp-container">
       <div className="hp-home d-flex flex-column min-vh-100">
-        <nav className="navbar navbar-expand-lg hp-navbar-custom" style={{ position: "sticky", top: 0, zIndex: 1030 }}>
-          <div className="container">
-            <Link className="hp-navbar-brand navbar-brand" to="/home">
-              <i className="bi bi-mortarboard-fill"></i> Filter X
-            </Link>
+        <Navbar />
 
-            <button
-              className="navbar-toggler"
-              type="button"
-              data-bs-toggle="collapse"
-              data-bs-target="#navbarNav"
-              aria-controls="navbarNav"
-              aria-expanded="false"
-              aria-label="Toggle navigation"
-              style={{ borderColor: "#d4af37" }}
-            >
-              <i className="bi bi-list" style={{ color: "#d4af37", fontSize: "1.5rem" }}></i>
-            </button>
-
-            <div className="collapse navbar-collapse" id="navbarNav">
-              <ul className="hp-navbar-nav navbar-nav ms-auto align-items-lg-center">
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/home">
-                    Home
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/about">
-                    About
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <span className="hp-nav-link nav-link text-warning">
-                    Profile
-                  </span>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/notifications">
-                    Notifications
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <a className="hp-nav-link nav-link" href="#" onClick={handleLogout}>
-                    Logout
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </nav>
-
-        <main className="hp-main container-fluid flex-grow-1 py-3 d-flex flex-column">
-          <div className="hp-content-wrapper">
+        <main className="hp-main-content container my-4 flex-grow-1">
+          <div className="row justify-content-center">
+            <div className="col-lg-8">
             <header className="hp-page-header">My Profile</header>
             <div className="hp-page-tagline">Your personal space on Filter X</div>
 
             <section className="hp-glass-card d-flex align-items-center mb-4">
               <img
-                src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+                src={getAvatarUrl(user)}
                 alt="Profile"
                 className="hp-profile-img me-4"
+                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
               />
               <div className="flex-grow-1">
                 <div className="hp-username">{user?.username || "User"}</div>
@@ -517,11 +687,13 @@ function Profile() {
 
             {/* Category Filter Section */}
             <section className="hp-glass-card mb-4">
-              <div className="d-flex justify-content-between align-items-center">
-                <h5>Filter My Posts by Category</h5>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 className="mb-0">
+                  <i className="bi bi-funnel me-2"></i>Filter My Posts by Category
+                </h5>
                 <div className="dropdown">
                   <button 
-                    className="btn btn-outline-secondary dropdown-toggle"
+                    className="btn btn-outline-secondary dropdown-toggle hp-category-filter-btn"
                     type="button"
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                   >
@@ -530,7 +702,7 @@ function Profile() {
                       : categories.find(c => c.id === parseInt(filterCategory))?.name || "Select Category"}
                   </button>
                   {showCategoryDropdown && (
-                    <div className="dropdown-menu show" style={{display: 'block'}}>
+                    <div className="dropdown-menu show hp-category-filter-menu" style={{display: 'block'}}>
                       <button 
                         className="dropdown-item" 
                         onClick={() => handleCategoryFilterChange("all")}
@@ -551,38 +723,169 @@ function Profile() {
                   )}
                 </div>
               </div>
-              
+
               {currentCategory && (
-                <div className="mt-3">
-                  <p className="mb-1">Currently viewing posts in: <strong>{currentCategory.name}</strong></p>
-                  <p className="mb-0 small text-muted">
-                    New posts will be automatically added to this category.
-                  </p>
+                <div className="mt-2 text-muted small">
+                  <i className="bi bi-info-circle me-1"></i>Currently viewing posts in <strong>{currentCategory.name}</strong>.
                 </div>
               )}
             </section>
 
-            {/* Post Creation Section */}
-            <section className="hp-glass-card mb-4">
+            {/* Post Creation Section with Photo & File Upload */}
+            <section className="hp-glass-card hp-compose-card mb-4">
               <textarea
                 id="hp-postText"
-                placeholder={currentCategory ? `What's on your mind about ${currentCategory.name}?` : "What's on your mind?"}
+                placeholder={currentCategory ? `What's on your mind about ${currentCategory.name}?` : "What's on your mind? Share text, code files, or photos..."}
                 rows="4"
                 value={postText}
                 onChange={(e) => setPostText(e.target.value)}
                 className="w-100"
               ></textarea>
               
-              {currentCategory && (
-                <div className="mt-2 small text-muted">
-                  <i className="bi bi-info-circle me-1"></i>
-                  This post will be added to the <strong>{currentCategory.name}</strong> category.
+              {/* Selected Attachments Previews */}
+              {(selectedPhotos.length > 0 || selectedFiles.length > 0) && (
+                <div className="attachment-previews-section mt-2">
+                  {/* Photos Preview */}
+                  {selectedPhotos.length > 0 && (
+                    <div>
+                      <small className="text-muted d-block mb-1">
+                        Photos ({selectedPhotos.length}/3):
+                      </small>
+                      <div className="photo-thumbnails-strip">
+                        {photoPreviews.map((url, idx) => (
+                          <div key={idx} className="thumbnail-preview-wrap">
+                            <img src={url} alt={`Preview ${idx + 1}`} />
+                            <button
+                              type="button"
+                              className="thumbnail-remove-btn"
+                              onClick={() => removeSelectedPhoto(idx)}
+                              title="Remove photo"
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Files Preview */}
+                  {selectedFiles.length > 0 && (
+                    <div>
+                      <small className="text-muted d-block mb-1">
+                        Files ({selectedFiles.length}/3):
+                      </small>
+                      <div className="file-chips-strip">
+                        {selectedFiles.map((file, idx) => {
+                          const meta = getFileMeta(file.name);
+                          return (
+                            <div key={idx} className="file-chip">
+                              <i className={`bi ${meta.icon}`} style={{ color: meta.color }}></i>
+                              <span className="file-chip-name">{file.name}</span>
+                              <span className="text-muted small">({formatFileSize(file.size)})</span>
+                              <button
+                                type="button"
+                                className="file-chip-remove"
+                                onClick={() => removeSelectedFile(idx)}
+                                title="Remove file"
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="d-flex justify-content-end mt-3">
-                <button onClick={handlePost} className="hp-btn hp-btn-glass btn">
-                  <i className="bi bi-feather me-2"></i>Post
+              {/* Category Selector Dropdown inside Create Post Form */}
+              <div className="d-flex align-items-center gap-2 mt-3 pt-2 border-top">
+                <span className="small text-muted fw-bold">Category:</span>
+                <select
+                  className="form-select form-select-sm hp-category-select"
+                  value={postCategoryId || (filterCategory !== "all" ? filterCategory : "")}
+                  onChange={(e) => setPostCategoryId(e.target.value)}
+                >
+                  <option value="">Select Category (Optional)</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                {(postCategoryId || (filterCategory !== "all" && filterCategory)) && (
+                  <span
+                    className="category-pill"
+                    style={{
+                      backgroundColor:
+                        categories.find(c => c.id === parseInt(postCategoryId || filterCategory))?.color || '#6c757d',
+                      color: '#fff'
+                    }}
+                  >
+                    #{categories.find(c => c.id === parseInt(postCategoryId || filterCategory))?.name}
+                  </span>
+                )}
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                <div className="d-flex gap-2">
+                  <input
+                    type="file"
+                    ref={photoInputRef}
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={handlePhotoSelect}
+                  />
+                  <button
+                    type="button"
+                    className="btn hp-attach-btn"
+                    onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                    disabled={selectedPhotos.length >= 3}
+                    title="Add up to 3 photos (JPG, PNG, WEBP, GIF, max 2 MB)"
+                  >
+                    <i className="bi bi-image text-success me-1"></i>
+                    Photos ({selectedPhotos.length}/3)
+                  </button>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={handleFileSelect}
+                  />
+                  <button
+                    type="button"
+                    className="btn hp-attach-btn"
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    disabled={selectedFiles.length >= 3}
+                    title="Attach up to 3 study/code files (max 2 MB each)"
+                  >
+                    <i className="bi bi-paperclip text-primary me-1"></i>
+                    Files ({selectedFiles.length}/3)
+                  </button>
+                </div>
+
+                <button
+                  onClick={handlePost}
+                  className="hp-btn hp-btn-glass btn"
+                  disabled={isPosting || (!postText.trim() && selectedPhotos.length === 0 && selectedFiles.length === 0)}
+                >
+                  {isPosting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Posting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-feather me-2"></i>Post
+                    </>
+                  )}
                 </button>
               </div>
             </section>
@@ -599,9 +902,13 @@ function Profile() {
                     key={post.id}
                     post={post}
                     user={user}
+                    categories={categories}
+                    onPhotoClick={(url, name) => setLightboxImage({ url, alt: name })}
                     onDeletePost={handleDeletePost}
+                    onEditPost={handleEditPost}
                     onLikePost={handleLikePost}
                     onCommentPost={handleCommentPost}
+                    onEditComment={handleEditComment}
                     onLikeComment={handleLikeComment}
                     onLikeReply={handleLikeReply}
                     onReplyToComment={handleReplyToComment}
@@ -621,25 +928,65 @@ function Profile() {
                 </div>
               )}
             </section>
+            </div>
           </div>
         </main>
       </div>
+
+      {/* Lightbox Modal */}
+      <LightboxModal image={lightboxImage} onClose={() => setLightboxImage(null)} />
     </div>
   );
 }
 
-function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLikeComment, onLikeReply, onReplyToComment, onDeleteComment, onDeleteReply }) {
+// =============================================================================
+// PROFILE POST COMPONENT (Display & Edit Mode with Attachment CRUD)
+// =============================================================================
+function ProfilePost({
+  post,
+  user,
+  categories,
+  onPhotoClick,
+  onDeletePost,
+  onEditPost,
+  onLikePost,
+  onCommentPost,
+  onEditComment,
+  onLikeComment,
+  onLikeReply,
+  onReplyToComment,
+  onDeleteComment,
+  onDeleteReply
+}) {
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [commentPhoto, setCommentPhoto] = useState(null);
+  const [commentPhotoPreview, setCommentPhotoPreview] = useState(null);
+  const [commentFile, setCommentFile] = useState(null);
   const [commentReplies, setCommentReplies] = useState({});
 
-  // DEBUG: Check category data
-  console.log("ProfilePost category:", post.category);
+  // Post Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content || "");
+  const [editCategoryId, setEditCategoryId] = useState(post.category?.id || "");
+  const [removeAttachmentIds, setRemoveAttachmentIds] = useState([]);
+  const [newPhotos, setNewPhotos] = useState([]);
+  const [newPhotoPreviews, setNewPhotoPreviews] = useState([]);
+  const [newFiles, setNewFiles] = useState([]);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const commentPhotoInputRef = useRef(null);
+  const commentFileInputRef = useRef(null);
+  const editPhotoInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
+
+  const safeComments = Array.isArray(post.comments) ? post.comments : [];
+  const safeAttachments = Array.isArray(post.attachments) ? post.attachments : [];
 
   useEffect(() => {
     const loadAllReplies = async () => {
-      if (post.comments && post.comments.length > 0) {
-        for (const comment of post.comments) {
+      if (safeComments.length > 0) {
+        for (const comment of safeComments) {
           try {
             const response = await fetch(`http://localhost:8080/api/social/comments/${comment.id}/replies`);
             if (response.ok) {
@@ -654,13 +1001,172 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
     };
 
     loadAllReplies();
-  }, [post.comments]);
+  }, [safeComments]);
 
-  const submitComment = () => {
-    if (commentText.trim()) {
-      onCommentPost(post.id, commentText);
+  // Comment Attachment selection (Enforce: Max 1 Photo OR 1 File)
+  const handleCommentPhotoSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const check = validateSelectedFile(file, true);
+    if (!check.valid) {
+      alert(check.error);
+      return;
+    }
+    setCommentFile(null);
+    setCommentPhoto(file);
+    if (commentPhotoPreview) URL.revokeObjectURL(commentPhotoPreview);
+    setCommentPhotoPreview(URL.createObjectURL(file));
+    if (commentPhotoInputRef.current) commentPhotoInputRef.current.value = "";
+  };
+
+  const handleCommentFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const check = validateSelectedFile(file, false);
+    if (!check.valid) {
+      alert(check.error);
+      return;
+    }
+    if (commentPhotoPreview) URL.revokeObjectURL(commentPhotoPreview);
+    setCommentPhoto(null);
+    setCommentPhotoPreview(null);
+    setCommentFile(file);
+    if (commentFileInputRef.current) commentFileInputRef.current.value = "";
+  };
+
+  const clearCommentAttachment = () => {
+    if (commentPhotoPreview) URL.revokeObjectURL(commentPhotoPreview);
+    setCommentPhoto(null);
+    setCommentPhotoPreview(null);
+    setCommentFile(null);
+  };
+
+  const submitComment = async () => {
+    if (!commentText.trim() && !commentPhoto && !commentFile) return;
+    const success = await onCommentPost(post.id, commentText, commentPhoto, commentFile);
+    if (success) {
       setCommentText("");
+      clearCommentAttachment();
       setShowCommentBox(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Post Edit Handlers
+  // ---------------------------------------------------------------------------
+  const startEdit = () => {
+    setEditContent(post.content || "");
+    setEditCategoryId(post.category?.id ? post.category.id.toString() : "");
+    setRemoveAttachmentIds([]);
+    newPhotoPreviews.forEach(url => URL.revokeObjectURL(url));
+    setNewPhotos([]);
+    setNewPhotoPreviews([]);
+    setNewFiles([]);
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    newPhotoPreviews.forEach(url => URL.revokeObjectURL(url));
+    setNewPhotos([]);
+    setNewPhotoPreviews([]);
+    setNewFiles([]);
+    setRemoveAttachmentIds([]);
+    setIsEditing(false);
+  };
+
+  const toggleRemoveExistingAttachment = (attId) => {
+    setRemoveAttachmentIds(prev =>
+      prev.includes(attId) ? prev.filter(id => id !== attId) : [...prev, attId]
+    );
+  };
+
+  const handleEditPhotoSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const keptPhotosCount = safeAttachments
+      .filter(a => a.attachmentType === 'PHOTO' && !removeAttachmentIds.includes(a.id))
+      .length;
+
+    if (keptPhotosCount + newPhotos.length + files.length > 3) {
+      alert("Maximum 3 photos allowed per post");
+      return;
+    }
+
+    const validNew = [];
+    const previews = [];
+    for (const f of files) {
+      const check = validateSelectedFile(f, true);
+      if (!check.valid) {
+        alert(check.error);
+        continue;
+      }
+      validNew.push(f);
+      previews.push(URL.createObjectURL(f));
+    }
+    setNewPhotos(prev => [...prev, ...validNew]);
+    setNewPhotoPreviews(prev => [...prev, ...previews]);
+    if (editPhotoInputRef.current) editPhotoInputRef.current.value = "";
+  };
+
+  const removeNewPhoto = (index) => {
+    URL.revokeObjectURL(newPhotoPreviews[index]);
+    setNewPhotos(prev => prev.filter((_, i) => i !== index));
+    setNewPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEditFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const keptFilesCount = safeAttachments
+      .filter(a => a.attachmentType === 'FILE' && !removeAttachmentIds.includes(a.id))
+      .length;
+
+    if (keptFilesCount + newFiles.length + files.length > 3) {
+      alert("Maximum 3 files allowed per post");
+      return;
+    }
+
+    const validNew = [];
+    for (const f of files) {
+      const check = validateSelectedFile(f, false);
+      if (!check.valid) {
+        alert(check.error);
+        continue;
+      }
+      validNew.push(f);
+    }
+    setNewFiles(prev => [...prev, ...validNew]);
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+  };
+
+  const removeNewFile = (index) => {
+    setNewFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEdit = async () => {
+    const text = editContent.trim();
+    const keptCount = safeAttachments.filter(a => !removeAttachmentIds.includes(a.id)).length;
+    const totalRemaining = keptCount + newPhotos.length + newFiles.length;
+
+    if (!text && totalRemaining === 0) {
+      alert("Post cannot be empty. Must have either text or at least one attachment.");
+      return;
+    }
+
+    setEditSubmitting(true);
+    const result = await onEditPost(
+      post.id,
+      text,
+      removeAttachmentIds,
+      newPhotos,
+      newFiles,
+      editCategoryId || null
+    );
+    setEditSubmitting(false);
+    if (result && result.success) {
+      cancelEdit();
     }
   };
 
@@ -676,27 +1182,21 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
   };
 
   return (
-    <article className="hp-glass-card hp-post mb-3 position-relative">
-      <button
-        className="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2"
-        onClick={() => onDeletePost(post.id)}
-        title="Delete post"
-      >
-        <i className="bi bi-trash"></i>
-      </button>
-
+    <article className="hp-glass-card hp-post mb-3 position-relative" id={`post-${post.id}`}>
+      {/* Header */}
       <div className="d-flex align-items-center mb-3">
         <img
-          src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+          src={getAvatarUrl(post.user || user)}
           alt="Profile"
           className="hp-profile-mini me-2"
+          onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
         />
         <strong className="hp-username">{user?.username || "User"}</strong>
         
-        {/* Display category badge with color - using optional chaining for safety */}
+        {/* Category badge */}
         {post.category && post.category.name && (
           <span 
-            className="badge ms-2"
+            className="category-pill ms-2"
             style={{ 
               backgroundColor: post.category.color || '#6c757d',
               color: '#fff'
@@ -706,12 +1206,179 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
           </span>
         )}
         
-        <small className="text-muted ms-auto">
+        <small className="text-muted ms-auto me-2">
           {post.createdAt ? new Date(post.createdAt).toLocaleString() : "Recently"}
         </small>
-      </div>
-      <p>{post.content}</p>
 
+        {/* Post Actions (Edit & Delete) */}
+        {!isEditing && (
+          <div className="d-flex gap-1">
+            <button
+              className="btn btn-sm btn-outline-secondary"
+              onClick={startEdit}
+              title="Edit post"
+            >
+              <i className="bi bi-pencil"></i>
+            </button>
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => onDeletePost(post.id)}
+              title="Delete post"
+            >
+              <i className="bi bi-trash"></i>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Post Body: Normal vs Edit Mode */}
+      {isEditing ? (
+        <div className="edit-post-card mb-3">
+          <label className="form-label small fw-bold">Edit Content:</label>
+          <textarea
+            className="form-control mb-2"
+            rows="3"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            placeholder="Edit text content..."
+          ></textarea>
+
+          {/* Category Selector in Edit Post */}
+          <div className="mb-3 d-flex align-items-center gap-2">
+            <label className="form-label small fw-bold mb-0">Category:</label>
+            <select
+              className="form-select form-select-sm hp-category-select"
+              value={editCategoryId || ""}
+              onChange={(e) => setEditCategoryId(e.target.value)}
+            >
+              <option value="">No Category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Existing Attachments Removal */}
+          {safeAttachments.length > 0 && (
+            <div className="mb-3">
+              <label className="form-label small fw-bold text-muted">Manage Existing Attachments:</label>
+              <div className="d-flex flex-wrap gap-2">
+                {safeAttachments.map(att => {
+                  const isRemoved = removeAttachmentIds.includes(att.id);
+                  const meta = getFileMeta(att.fileName);
+                  return (
+                    <div
+                      key={att.id}
+                      className="border rounded p-1 px-2 d-flex align-items-center gap-2 small"
+                      style={{
+                        backgroundColor: isRemoved ? '#f8d7da' : '#e9ecef',
+                        textDecoration: isRemoved ? 'line-through' : 'none'
+                      }}
+                    >
+                      <i className={`bi ${att.attachmentType === 'PHOTO' ? 'bi-image' : meta.icon}`}></i>
+                      <span className="text-truncate" style={{ maxWidth: '140px' }}>{att.fileName}</span>
+                      <button
+                        type="button"
+                        className={`btn btn-sm py-0 px-1 ${isRemoved ? 'btn-outline-secondary' : 'btn-outline-danger'}`}
+                        onClick={() => toggleRemoveExistingAttachment(att.id)}
+                        title={isRemoved ? "Undo remove" : "Remove attachment"}
+                      >
+                        {isRemoved ? "Undo" : "Remove"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* New Attachments Preview */}
+          {(newPhotos.length > 0 || newFiles.length > 0) && (
+            <div className="attachment-previews-section mb-3">
+              {newPhotos.length > 0 && (
+                <div className="photo-thumbnails-strip mb-2">
+                  {newPhotoPreviews.map((url, i) => (
+                    <div key={i} className="thumbnail-preview-wrap">
+                      <img src={url} alt={`New Photo ${i + 1}`} />
+                      <button type="button" className="thumbnail-remove-btn" onClick={() => removeNewPhoto(i)}>&times;</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {newFiles.length > 0 && (
+                <div className="file-chips-strip">
+                  {newFiles.map((f, i) => (
+                    <div key={i} className="file-chip">
+                      <i className="bi bi-file-earmark-code text-primary"></i>
+                      <span className="file-chip-name">{f.name}</span>
+                      <button type="button" className="file-chip-remove" onClick={() => removeNewFile(i)}>&times;</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add New Attachments Controls */}
+          <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+            <div className="d-flex gap-2">
+              <input
+                type="file"
+                ref={editPhotoInputRef}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                style={{ display: "none" }}
+                onChange={handleEditPhotoSelect}
+              />
+              <button
+                type="button"
+                className="btn btn-sm hp-attach-btn"
+                onClick={() => editPhotoInputRef.current && editPhotoInputRef.current.click()}
+              >
+                <i className="bi bi-image text-success me-1"></i> Add Photos
+              </button>
+
+              <input
+                type="file"
+                ref={editFileInputRef}
+                multiple
+                style={{ display: "none" }}
+                onChange={handleEditFileSelect}
+              />
+              <button
+                type="button"
+                className="btn btn-sm hp-attach-btn"
+                onClick={() => editFileInputRef.current && editFileInputRef.current.click()}
+              >
+                <i className="bi bi-paperclip text-primary me-1"></i> Add Files
+              </button>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button className="cancel-btn btn btn-sm" onClick={cancelEdit} disabled={editSubmitting}>
+                Cancel
+              </button>
+              <button className="hp-btn hp-btn-glass btn btn-sm" onClick={saveEdit} disabled={editSubmitting}>
+                {editSubmitting ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {post.content && <p className="post-text-content">{post.content}</p>}
+
+          {/* Render Attached Photos in Grid */}
+          <AttachmentGallery attachments={safeAttachments} onPhotoClick={onPhotoClick} />
+
+          {/* Render Attached Files as Downloadable Cards */}
+          <FileList attachments={safeAttachments} />
+        </>
+      )}
+
+      {/* Action Buttons */}
       <div className="d-flex gap-2 flex-wrap hp-action-buttons mb-3">
         <button
           className="hp-btn hp-btn-outline-success hp-btn-outline-custom btn btn-sm"
@@ -729,9 +1396,10 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
         </button>
       </div>
 
+      {/* Comments Section */}
       <section className="hp-comments">
         {showCommentBox && (
-          <section className="hp-comment-box">
+          <section className="hp-comment-box mb-3 p-2 border rounded bg-light">
             <textarea
               className="form-control mb-2"
               placeholder="Write a comment..."
@@ -745,34 +1413,102 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
                 }
               }}
             ></textarea>
-            <div className="d-flex gap-2">
-              <button
-                className="hp-btn hp-btn-outline-secondary btn btn-sm"
-                onClick={() => setShowCommentBox(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="hp-btn hp-btn-glass btn btn-sm flex-grow-1"
-                onClick={submitComment}
-                disabled={!commentText.trim()}
-              >
-                <i className="bi bi-send me-1"></i>Post Comment
-              </button>
+
+            {/* Comment Attachment Preview (Max 1) */}
+            {(commentPhotoPreview || commentFile) && (
+              <div className="d-flex align-items-center gap-2 mb-2 p-1 bg-white border rounded">
+                {commentPhotoPreview && (
+                  <img
+                    src={commentPhotoPreview}
+                    alt="Comment Preview"
+                    style={{ width: "45px", height: "45px", objectFit: "cover", borderRadius: "4px" }}
+                  />
+                )}
+                {commentFile && (
+                  <div className="d-flex align-items-center gap-1 small text-truncate">
+                    <i className="bi bi-file-earmark-code text-primary"></i>
+                    <span className="text-truncate" style={{ maxWidth: "200px" }}>{commentFile.name}</span>
+                    <span className="text-muted">({formatFileSize(commentFile.size)})</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger ms-auto py-0 px-2"
+                  onClick={clearCommentAttachment}
+                  title="Remove attachment"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            {/* Actions & Attachment Buttons */}
+            <div className="d-flex justify-content-between align-items-center">
+              <div className="d-flex gap-1">
+                <input
+                  type="file"
+                  ref={commentPhotoInputRef}
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  style={{ display: "none" }}
+                  onChange={handleCommentPhotoSelect}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm hp-attach-btn-sm"
+                  onClick={() => commentPhotoInputRef.current && commentPhotoInputRef.current.click()}
+                  title="Attach 1 photo"
+                >
+                  <i className="bi bi-image text-success me-1"></i>Photo
+                </button>
+
+                <input
+                  type="file"
+                  ref={commentFileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleCommentFileSelect}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm hp-attach-btn-sm"
+                  onClick={() => commentFileInputRef.current && commentFileInputRef.current.click()}
+                  title="Attach 1 file (code/doc)"
+                >
+                  <i className="bi bi-paperclip text-primary me-1"></i>File
+                </button>
+              </div>
+
+              <div className="d-flex gap-2">
+                <button
+                  className="hp-btn hp-btn-outline-secondary btn btn-sm"
+                  onClick={() => setShowCommentBox(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="hp-btn hp-btn-glass btn btn-sm"
+                  onClick={submitComment}
+                  disabled={!commentText.trim() && !commentPhoto && !commentFile}
+                >
+                  <i className="bi bi-send me-1"></i>Post Comment
+                </button>
+              </div>
             </div>
           </section>
         )}
 
-        {post.comments?.map((comment) => (
+        {safeComments.map((comment) => (
           <ProfileComment
             key={comment.id}
             comment={comment}
+            postId={post.id}
             user={user}
+            onPhotoClick={onPhotoClick}
             onLikeComment={onLikeComment}
             onLikeReply={onLikeReply}
             onReplyToComment={onReplyToComment}
             onDeleteComment={onDeleteComment}
             onDeleteReply={onDeleteReply}
+            onEditComment={onEditComment}
             replies={commentReplies[comment.id] || []}
           />
         ))}
@@ -781,12 +1517,40 @@ function ProfilePost({ post, user, onDeletePost, onLikePost, onCommentPost, onLi
   );
 }
 
-function ProfileComment({ comment, user, onLikeComment, onLikeReply, onReplyToComment, onDeleteComment, onDeleteReply, replies = [] }) {
+// =============================================================================
+// PROFILE COMMENT COMPONENT (Display & Edit Mode with Auto-Delete Rule)
+// =============================================================================
+function ProfileComment({
+  comment,
+  postId,
+  user,
+  onPhotoClick,
+  onLikeComment,
+  onLikeReply,
+  onReplyToComment,
+  onDeleteComment,
+  onDeleteReply,
+  onEditComment,
+  replies = []
+}) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [showReplies, setShowReplies] = useState(false);
 
+  // Comment Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editCommentText, setEditCommentText] = useState(comment.content || "");
+  const [swapPhoto, setSwapPhoto] = useState(null);
+  const [swapPhotoPreview, setSwapPhotoPreview] = useState(null);
+  const [swapFile, setSwapFile] = useState(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const swapPhotoInputRef = useRef(null);
+  const swapFileInputRef = useRef(null);
+
   const safeReplies = Array.isArray(replies) ? replies : [];
+  const isCommentAuthor = user?.id === comment.user?.id;
+  const hasExistingAttachment = !!comment.attachment;
   
   const getCommentLikeCount = () => {
     if (typeof comment.likeCount === 'number') {
@@ -805,22 +1569,231 @@ function ProfileComment({ comment, user, onLikeComment, onLikeReply, onReplyToCo
     }
   };
 
-  return (
-    <article className="hp-comment mb-2">
-      <div className="d-flex align-items-center">
-        <img
-          src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
-          alt="Profile"
-          className="hp-profile-mini me-2"
-          style={{width: "30px", height: "30px"}}
-        />
-        <strong className="hp-username me-2">{comment.user?.username || "User"}:</strong>
-        <span>{comment.content}</span>
-      </div>
-      <small className="text-muted">
-        {new Date(comment.createdAt).toLocaleString()}
-      </small>
+  const startEdit = () => {
+    setEditCommentText(comment.content || "");
+    setSwapPhoto(null);
+    setSwapPhotoPreview(null);
+    setSwapFile(null);
+    setIsEditing(true);
+  };
 
+  const cancelEdit = () => {
+    if (swapPhotoPreview) URL.revokeObjectURL(swapPhotoPreview);
+    setSwapPhoto(null);
+    setSwapPhotoPreview(null);
+    setSwapFile(null);
+    setIsEditing(false);
+  };
+
+  const handleSwapPhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const check = validateSelectedFile(file, true);
+    if (!check.valid) {
+      alert(check.error);
+      return;
+    }
+    setSwapFile(null);
+    setSwapPhoto(file);
+    if (swapPhotoPreview) URL.revokeObjectURL(swapPhotoPreview);
+    setSwapPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSwapFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const check = validateSelectedFile(file, false);
+    if (!check.valid) {
+      alert(check.error);
+      return;
+    }
+    if (swapPhotoPreview) URL.revokeObjectURL(swapPhotoPreview);
+    setSwapPhoto(null);
+    setSwapPhotoPreview(null);
+    setSwapFile(file);
+  };
+
+  // ---------------------------------------------------------------------------
+  // AUTO-DELETE RULE:
+  // If user removes the comment's attachment without replacing it,
+  // the entire comment is automatically deleted!
+  // ---------------------------------------------------------------------------
+  const handleRemoveCommentAttachment = async () => {
+    const confirmed = window.confirm(
+      "⚠️ Removing the attachment will delete this entire comment.\n\nAre you sure you want to proceed?"
+    );
+    if (!confirmed) return;
+
+    setEditSubmitting(true);
+    await onEditComment(comment.id, postId, null, true, null, null);
+    setEditSubmitting(false);
+    setIsEditing(false);
+  };
+
+  const saveCommentEdit = async () => {
+    const text = editCommentText.trim();
+    const hasAtt = hasExistingAttachment || swapPhoto || swapFile;
+    if (!text && !hasAtt) {
+      alert("Comment cannot be empty.");
+      return;
+    }
+
+    setEditSubmitting(true);
+    const success = await onEditComment(
+      comment.id,
+      postId,
+      text,
+      false,
+      swapPhoto,
+      swapFile
+    );
+    setEditSubmitting(false);
+    if (success) {
+      cancelEdit();
+    }
+  };
+
+  return (
+    <article className="hp-comment mb-2 p-2 border-bottom" id={`comment-${comment.id}`}>
+      {/* Header */}
+      <div className="d-flex align-items-center justify-content-between">
+        <div className="d-flex align-items-center">
+          <img
+            src={getAvatarUrl(comment.user)}
+            alt="Profile"
+            className="hp-profile-mini me-2"
+            style={{width: "30px", height: "30px"}}
+            onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+          />
+          <strong className="hp-username me-2">{comment.user?.username || "User"}</strong>
+          <small className="text-muted">
+            {new Date(comment.createdAt).toLocaleString()}
+          </small>
+        </div>
+
+        {/* Comment Author Edit & Delete */}
+        {isCommentAuthor && !isEditing && (
+          <div className="d-flex gap-1">
+            <button
+              className="btn btn-sm py-0 px-1 btn-outline-secondary"
+              onClick={startEdit}
+              title="Edit comment"
+            >
+              <i className="bi bi-pencil" style={{ fontSize: "0.8rem" }}></i>
+            </button>
+            <button
+              className="btn btn-sm py-0 px-1 btn-outline-danger"
+              onClick={() => onDeleteComment(comment.id)}
+              title="Delete comment"
+            >
+              <i className="bi bi-trash" style={{ fontSize: "0.8rem" }}></i>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Comment Body: Edit Mode vs Normal View */}
+      {isEditing ? (
+        <div className="mt-2 p-2 bg-light border rounded">
+          <textarea
+            className="form-control mb-2"
+            rows="2"
+            value={editCommentText}
+            onChange={(e) => setEditCommentText(e.target.value)}
+          ></textarea>
+
+          {/* Current Attachment & Auto-Delete Trigger */}
+          {hasExistingAttachment && !swapPhoto && !swapFile && (
+            <div className="d-flex align-items-center justify-content-between p-1 px-2 mb-2 bg-white border rounded">
+              <span className="small text-truncate">
+                <i className="bi bi-paperclip me-1"></i>
+                {comment.attachment.fileName}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger py-0 px-2 small"
+                onClick={handleRemoveCommentAttachment}
+                title="Removing this attachment deletes the entire comment"
+              >
+                <i className="bi bi-trash me-1"></i>Remove Attachment (Deletes Comment)
+              </button>
+            </div>
+          )}
+
+          {/* Swapped Attachment Preview */}
+          {(swapPhotoPreview || swapFile) && (
+            <div className="d-flex align-items-center gap-2 p-1 px-2 mb-2 bg-white border rounded">
+              {swapPhotoPreview && (
+                <img src={swapPhotoPreview} alt="Swap Preview" style={{ width: "40px", height: "40px", objectFit: "cover" }} />
+              )}
+              {swapFile && <span className="small text-truncate">{swapFile.name}</span>}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary py-0 px-1 ms-auto"
+                onClick={() => {
+                  setSwapPhoto(null);
+                  setSwapPhotoPreview(null);
+                  setSwapFile(null);
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          )}
+
+          {/* Edit Actions */}
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex gap-1">
+              <input
+                type="file"
+                ref={swapPhotoInputRef}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                style={{ display: "none" }}
+                onChange={handleSwapPhoto}
+              />
+              <button
+                type="button"
+                className="btn btn-sm hp-attach-btn-sm"
+                onClick={() => swapPhotoInputRef.current && swapPhotoInputRef.current.click()}
+                title="Swap with photo"
+              >
+                <i className="bi bi-image text-success me-1"></i>Photo
+              </button>
+
+              <input
+                type="file"
+                ref={swapFileInputRef}
+                style={{ display: "none" }}
+                onChange={handleSwapFile}
+              />
+              <button
+                type="button"
+                className="btn btn-sm hp-attach-btn-sm"
+                onClick={() => swapFileInputRef.current && swapFileInputRef.current.click()}
+                title="Swap with file"
+              >
+                <i className="bi bi-paperclip text-primary me-1"></i>File
+              </button>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button className="cancel-btn btn btn-sm" onClick={cancelEdit} disabled={editSubmitting}>
+                Cancel
+              </button>
+              <button className="hp-btn hp-btn-glass btn btn-sm" onClick={saveCommentEdit} disabled={editSubmitting}>
+                {editSubmitting ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {comment.content && <div className="mt-1">{comment.content}</div>}
+          <CommentAttachmentView attachment={comment.attachment} onPhotoClick={onPhotoClick} />
+        </>
+      )}
+
+      {/* Comment Actions (Like, Reply, Count) */}
       <div className="d-flex gap-2 mt-2">
         <button
           className="cmrp-like btn-sm"
@@ -836,15 +1809,6 @@ function ProfileComment({ comment, user, onLikeComment, onLikeReply, onReplyToCo
         >
           <i className="bi bi-reply"></i> Reply
         </button>
-        {comment.user?.id === user?.id && (
-          <button
-            className="btn-sm cmrp-delete"
-            title="Delete comment"
-            onClick={() => onDeleteComment(comment.id)}
-          >
-            <i className="bi bi-trash"></i> Delete
-          </button>
-        )}
         {safeReplies.length > 0 && (
           <button
             className="hp-btn hp-btn-outline-info btn-sm"
@@ -894,10 +1858,11 @@ function ProfileComment({ comment, user, onLikeComment, onLikeReply, onReplyToCo
             <div key={reply.id} className="hp-reply mb-1">
               <div className="d-flex align-items-center">
                 <img
-                  src="https://i.pinimg.com/736x/54/c7/c3/54c7c36c20ced3eb982c4e3e21f465fe.jpg"
+                  src={getAvatarUrl(reply.user)}
                   alt="Profile"
                   className="hp-profile-mini me-2"
                   style={{width: "25px", height: "25px"}}
+                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                 />
                 <strong className="hp-username me-2">{reply.user?.username || "User"}:</strong>
                 <span>{reply.content}</span>

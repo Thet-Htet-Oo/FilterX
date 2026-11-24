@@ -1,138 +1,150 @@
-import joblib
-import re
 import requests
 import json
 import time
 from typing import Dict, Any
 
-# URL of your running Flask API
 API_URL = "http://127.0.0.1:5000/predict"
 
-# Optional: Set a flag to run the interactive test
-RUN_INTERACTIVE_TEST = True
-
-# A dictionary of test cases organized by category
+# Test suite organized by category
 test_cases: Dict[str, Dict[str, Any]] = {
-    "Clearly Toxic": {
+    "Standalone Profanity (Must be Toxic)": {
         "comments": [
-            "Fuck you bitch",
-            "Go die in a hole",
-            "Kill yourself",
-            "You're a worthless piece of shit",
-            "You're a fucking idiot",
-            "I hope you die",
-            "You're trash",
-            "Shut up moron",
-            "You are a disgusting fool"
+            "fking",
+            "fuck",
+            "shit",
+            "bitch",
+            "asshole"
         ],
         "expected_class": "Toxic"
     },
-    "Clearly Clean": {
+    "Benign Intensifiers (Must be Clean)": {
         "comments": [
-            "This is a great day!",
-            "Thank you so much, this was very helpful.",
-            "I love this amazing app.",
-            "Have a wonderful weekend.",
-            "You are a very kind person."
+            "This is fking good!",
+            "This is fucking awesome",
+            "Damn good performance",
+            "That meal was fking great",
+            "This car is fking cool"
         ],
         "expected_class": "Clean"
     },
-    "Ambiguous/Idiomatic": {
+    "Idioms & Figurative Speech (Must be Clean)": {
         "comments": [
-            "This cake is to die for",  # Idiom
-            "You killed it in that presentation", # Idiom
-            "That's a sick beat", # Slang
-            "I'm dead, that was so funny" # Slang
+            "Break a leg tonight!",
+            "You killed it in that presentation",
+            "This cake is to die for",
+            "That's a sick beat bro",
+            "I'm dead, that joke was hilarious"
         ],
         "expected_class": "Clean"
     },
-    "Leetspeak/Evasion": {
+    "Proper Names with Lee (Must be Clean)": {
+        "comments": [
+            "Bruce Lee is an icon",
+            "Hi Lee, how are you doing?",
+            "Stan Lee created amazing characters"
+        ],
+        "expected_class": "Clean"
+    },
+    "Direct Threats & Harm (Must be Toxic)": {
+        "comments": [
+            "I will break your leg",
+            "Kill yourself",
+            "Go die in a hole",
+            "I hope you die",
+            "I'm going to kill you"
+        ],
+        "expected_class": "Toxic"
+    },
+    "Targeted Abuse & Insults (Must be Toxic)": {
+        "comments": [
+            "You're a fking idiot",
+            "You are a worthless piece of shit",
+            "Fuck you bitch",
+            "Shut up moron",
+            "You are disgusting trash"
+        ],
+        "expected_class": "Toxic"
+    },
+    "Myanmar Slang & Acronyms (Must be Toxic)": {
+        "comments": [
+            "kmkl",
+            "lee pl",
+            "lee lar",
+            "lee lo"
+        ],
+        "expected_class": "Toxic"
+    },
+    "Leetspeak / Evasion (Must be Toxic)": {
         "comments": [
             "F*ck you",
             "Sh1t head",
-            "You're a b*tch",
-            "Go d1e",
             "K1ll yourself",
-            "You're a ret*rd",
-            "Stup1d idiot",
-            "M0ron"
+            "You're a b*tch",
+            "Stup1d idiot"
         ],
         "expected_class": "Toxic"
     },
-    "Mixed Toxicity (potentially clean)": {
+    "Everyday Positive / Clean": {
         "comments": [
-            "I hate my homework, not you", # Mixed toxic and non-toxic intent
-            "I feel so stupid for not getting this",
-            "You are so brilliant it's disgusting", # Sarcasm/irony
-            "You suck at basketball, but you're a great friend" # Mixed
+            "Thank you so much for your help!",
+            "Have a great weekend everyone.",
+            "I really love this application.",
+            "Good morning, hope you have a nice day.",
+            "Do you know kpop ?",
+            "wanna have a discussion about this ?"
         ],
         "expected_class": "Clean"
     }
 }
 
 def run_tests():
-    """Runs a comprehensive suite of tests against the API and reports the results."""
-    print("🧪 COMPREHENSIVE MODEL TESTING")
-    print("=" * 60)
-    
+    print("=" * 70)
+    print("FilterX Moderation Test Suite")
+    print("=" * 70)
+
     total_tests = sum(len(d["comments"]) for d in test_cases.values())
     passed_tests = 0
-    
+    failed_cases = []
+
     for category, data in test_cases.items():
-        print(f"\n--- {category} (Expecting: {data['expected_class']}) ---")
-        
+        expected = data["expected_class"]
+        print(f"\n--- {category} (Expecting: {expected}) ---")
+
         for comment in data["comments"]:
             try:
-                response = requests.post(API_URL, json={"text": comment}, timeout=5)
-                
+                response = requests.post(API_URL, json={"text": comment}, timeout=15)
                 if response.status_code == 200:
                     result = response.json()
-                    is_correct = result.get("result") == data["expected_class"]
-                    
+                    actual = result.get("result")
+                    is_correct = (actual == expected)
+
                     if is_correct:
                         passed_tests += 1
-                        status_msg = "✅ PASS"
+                        status_msg = "PASS"
                     else:
-                        status_msg = "❌ FAIL"
-                        
-                    print(f"[{status_msg}] Input: '{comment}'")
-                    print(f"  Response: {json.dumps(result, indent=2)}")
-                else:
-                    print(f"⚠️ ERROR: API returned status code {response.status_code} for '{comment}'")
-            except requests.exceptions.RequestException as e:
-                print(f"⚠️ ERROR: Could not connect to API. Is it running at {API_URL}?")
-                print(f"  Details: {e}")
-                return # Exit on connection failure
-            
-            time.sleep(0.1) # Small delay to avoid flooding the API
+                        status_msg = "FAIL"
+                        failed_cases.append((comment, expected, actual, result.get("note")))
 
-    print("\n" + "=" * 60)
-    print(f"🏁 Test Suite Complete: {passed_tests}/{total_tests} tests passed.")
-    if passed_tests < total_tests:
-        print("💡 The model may need more diverse training data or a refined cleaning function.")
-    
-def run_interactive():
-    """Allows a user to interactively test the model with their own input."""
-    print("\n--- Interactive Test Mode ---")
-    print("Type any sentence to test the model, or 'quit' to exit.")
-    
-    while True:
-        user_input = input("\n> Enter a sentence: ")
-        if user_input.lower() == "quit":
-            break
-        
-        try:
-            response = requests.post(API_URL, json={"text": user_input}, timeout=5)
-            if response.status_code == 200:
-                print(json.dumps(response.json(), indent=2))
-            else:
-                print(f"Error {response.status_code}: {response.text}")
-        except requests.exceptions.RequestException as e:
-            print(f"ERROR: Could not connect to API. Is it running at {API_URL}?")
-            print(f"Details: {e}")
-            break
+                    note = result.get("note", "")
+                    conf = result.get("confidence", 0)
+                    print(f"[{status_msg}] '{comment}' -> {actual} (conf: {conf:.2f}, note: {note})")
+                else:
+                    print(f"[ERROR] Status {response.status_code} for '{comment}': {response.text}")
+                    failed_cases.append((comment, expected, f"HTTP {response.status_code}", ""))
+            except requests.exceptions.RequestException as e:
+                print(f"[CONNECTION ERROR] Could not reach API at {API_URL}: {e}")
+                print("Make sure comment_api.py is running on port 5000.")
+                return
+
+            time.sleep(0.05)
+
+    print("\n" + "=" * 70)
+    print(f"RESULTS: {passed_tests}/{total_tests} tests passed ({passed_tests/total_tests*100:.1f}%)")
+    if failed_cases:
+        print("\nFailed Cases:")
+        for text, exp, act, note in failed_cases:
+            print(f"  - '{text}': Expected {exp}, Got {act} ({note})")
+    print("=" * 70)
 
 if __name__ == "__main__":
     run_tests()
-    if RUN_INTERACTIVE_TEST:
-        run_interactive()

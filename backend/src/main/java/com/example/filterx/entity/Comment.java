@@ -14,7 +14,7 @@ public class Comment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false, length = 500)
+    @Column(nullable = true, length = 500)
     private String content;
     
     @ManyToOne
@@ -36,6 +36,10 @@ public class Comment {
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Reply> replies = new ArrayList<>();
+
+    @OneToOne(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private CommentAttachment attachment;
     
     public Comment() {
         this.createdAt = LocalDateTime.now();
@@ -63,6 +67,8 @@ public class Comment {
     public void setLikes(List<CommentLike> likes) { this.likes = likes; }
     public List<Reply> getReplies() { return replies; }
     public void setReplies(List<Reply> replies) { this.replies = replies; }
+    public CommentAttachment getAttachment() { return attachment; }
+    public void setAttachment(CommentAttachment attachment) { this.attachment = attachment; }
     
     // Helper method to add like
     public void addLike(CommentLike like) {

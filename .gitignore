@@ -12,6 +12,8 @@ target/
 # Python
 __pycache__/
 *.pyc
+.env
+*.env
 
 # IDE
 .idea/

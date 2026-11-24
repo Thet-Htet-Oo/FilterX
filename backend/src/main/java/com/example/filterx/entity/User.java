@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "users")
@@ -32,6 +33,14 @@ public class User {
     
     private String fullName; // ADD THIS FIELD
     private String phoneNumber; // ADD THIS FIELD
+
+    @Lob
+    @Column(name = "profile_picture", columnDefinition = "MEDIUMBLOB")
+    @JsonIgnore
+    private byte[] profilePicture;
+
+    @Column(name = "profile_picture_type", length = 100)
+    private String profilePictureType;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -80,8 +89,33 @@ public class User {
     public void setLikes(List<Like> likes) { this.likes = likes; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     public String getCountryCode() { return countryCode; }
     public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
+
+    public byte[] getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(byte[] profilePicture) { this.profilePicture = profilePicture; }
+
+    public String getProfilePictureType() { return profilePictureType; }
+    public void setProfilePictureType(String profilePictureType) { this.profilePictureType = profilePictureType; }
+
+    @Transient
+    @JsonProperty("hasProfilePicture")
+    public boolean hasProfilePicture() {
+        return this.profilePicture != null && this.profilePicture.length > 0;
+    }
+
+    @Transient
+    @JsonProperty("profilePictureUrl")
+    public String getProfilePictureUrl() {
+        if (!hasProfilePicture()) {
+            return null;
+        }
+        long ts = this.updatedAt != null ? java.sql.Timestamp.valueOf(this.updatedAt).getTime() : System.currentTimeMillis();
+        return "http://localhost:8080/api/users/" + this.id + "/avatar?v=" + ts;
+    }
 }

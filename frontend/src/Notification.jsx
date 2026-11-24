@@ -1,32 +1,21 @@
 // src/components/Notification.jsx
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
+import { useNotifications } from "./NotificationContext.js";
 import { useToast } from "./ToastContext.jsx";
+import Navbar from "./Navbar.jsx";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./home.css";
 
 function Notification() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
+  const { setUnreadCount } = useNotifications();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Load Bootstrap JS for navbar toggler
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     loadNotifications();
@@ -66,6 +55,7 @@ function Notification() {
             notif.id === notificationId ? {...notif, isRead: true} : notif
           )
         );
+        setUnreadCount(prev => Math.max(0, prev - 1));
         return true;
       }
     } catch (error) {
@@ -87,18 +77,13 @@ function Notification() {
         setNotifications(prev =>
           prev.map(notif => ({...notif, isRead: true}))
         );
+        setUnreadCount(0);
         addToast("All notifications marked as read", "success");
       }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
       addToast("Error marking notifications as read", "error");
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    addToast("You have been logged out successfully", "info");
-    navigate("/");
   };
 
   const getNotificationIcon = (type) => {
@@ -138,8 +123,7 @@ function Notification() {
   };
 
   const handleNotificationClick = async (notification) => {
-    // Mark as read
-    const markedAsRead = await markAsRead(notification.id);
+    const markedAsRead = notification.isRead || await markAsRead(notification.id);
 
     if (markedAsRead) {
       // Navigate to home page with notification data
@@ -169,58 +153,11 @@ function Notification() {
   return (
     <div className="hp-container">
       <div className="hp-home d-flex flex-column min-vh-100">
-        {/* Navbar */}
-        <nav className="navbar navbar-expand-lg hp-navbar-custom" style={{ position: "sticky", top: 0, zIndex: 1030 }}>
-          <div className="container">
-            <Link className="hp-navbar-brand navbar-brand" to="/home">
-              <i className="bi bi-mortarboard-fill"></i> Filter X
-            </Link>
-            <button
-              className="navbar-toggler"
-              type="button"
-              data-bs-toggle="collapse"
-              data-bs-target="#navbarNav"
-              aria-controls="navbarNav"
-              aria-expanded="false"
-              aria-label="Toggle navigation"
-              style={{ borderColor: "#d4af37" }}
-            >
-              <i className="bi bi-list" style={{ color: "#d4af37", fontSize: "1.5rem" }}></i>
-            </button>
-            <div className="collapse navbar-collapse" id="navbarNav">
-              <ul className="hp-navbar-nav navbar-nav ms-auto align-items-lg-center">
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/home">
-                    Home
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/about">
-                    About
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <Link className="hp-nav-link nav-link" to="/profile">
-                    Profile
-                  </Link>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <span className="hp-nav-link nav-link text-warning">
-                    Notifications
-                  </span>
-                </li>
-                <li className="hp-nav-item nav-item">
-                  <a className="hp-nav-link nav-link" href="#" onClick={handleLogout}>
-                    Logout
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </nav>
+        <Navbar />
 
-        <main className="hp-main container-fluid flex-grow-1 py-3 d-flex flex-column">
-          <div className="hp-content-wrapper">
+        <main className="hp-main-content container my-4 flex-grow-1">
+          <div className="row justify-content-center">
+            <div className="col-lg-8">
             <header className="hp-page-header">Notifications</header>
             <div className="hp-page-tagline">Stay updated with your activity</div>
 
@@ -288,6 +225,7 @@ function Notification() {
                 </div>
               )}
             </section>
+            </div>
           </div>
         </main>
       </div>

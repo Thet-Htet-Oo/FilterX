@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonIgnore; // Add this import
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "posts")
@@ -13,7 +13,7 @@ public class Post {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false, length = 1000)
+    @Column(nullable = true, length = 1000)
     private String content;
     
     @ManyToOne
@@ -22,15 +22,17 @@ public class Post {
     
     private LocalDateTime createdAt;
     
-    // ⚠️ REMOVE DUPLICATE FIELD - KEEP ONLY ONE comments FIELD
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnore // Add this to prevent circular references
+    @JsonIgnore
     private List<Comment> comments = new ArrayList<>();
     
-    // ⚠️ REMOVE DUPLICATE FIELD - KEEP ONLY ONE likes FIELD
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnore // Add this to prevent circular references
+    @JsonIgnore
     private List<Like> likes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<PostAttachment> attachments = new ArrayList<>();
     
     public Post() {
         this.createdAt = LocalDateTime.now();
@@ -46,11 +48,9 @@ public class Post {
     @JoinColumn(name = "category_id")
     private Category category;
 
-    // Add getter and setter
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
     
-    // Getters and setters - ONLY ONE SET PER FIELD
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
@@ -68,4 +68,7 @@ public class Post {
     
     public List<Like> getLikes() { return likes; }
     public void setLikes(List<Like> likes) { this.likes = likes; }
+
+    public List<PostAttachment> getAttachments() { return attachments; }
+    public void setAttachments(List<PostAttachment> attachments) { this.attachments = attachments; }
 }
