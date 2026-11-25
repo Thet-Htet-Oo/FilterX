@@ -1,4 +1,4 @@
-# FilterX – AI-Powered Social Learning Platform
+# FilterX 
 
 FilterX is a full-stack social learning platform designed to provide a space where users can share knowledge, interact with others, and participate in a safer online community.
 
